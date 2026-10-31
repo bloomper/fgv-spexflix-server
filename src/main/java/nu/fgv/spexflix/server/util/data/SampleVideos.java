@@ -67,7 +67,7 @@ final class SampleVideos {
                 List.of("-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k")));
         sources.add(fallback(ffmpeg, folder, "vp9-480p", 854, 480, Math.max(seconds / 2, 6)));
         sources.add(make(ffmpeg, folder, "mpeg2-interlaced", "mpg", 720, 576, Math.max(seconds / 2, 6), true,
-                List.of("-c:v", "mpeg2video", "-b:v", "6M", "-flags", "+ilme+ildct", "-top", "1", "-c:a", "mp2", "-b:a", "192k")));
+                List.of("-c:v", "mpeg2video", "-b:v", "6M", "-flags", "+ilme+ildct", "-c:a", "mp2", "-b:a", "192k")));
 
         final Path text = folder.resolve("not-video.txt");
 
