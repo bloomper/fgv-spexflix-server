@@ -1,0 +1,39 @@
+# Local development: MySQL and the media server (nginx with secure_link) for an API run with
+# `./gradlew bootRun --args='--spring.profiles.active=local'`, which also runs the worker. The media server's
+# configuration is fgv-spexflix-deploy's. Keycloak and Spexregister come from fgv-infra-deploy/local and
+# spexregister-server.
+name: fgv-spexflix-server
+
+services:
+  spexflix-mysql:
+    image: 'mysql:8.4'
+    environment:
+      MYSQL_DATABASE: spexflix
+      MYSQL_USER: spexflix
+      MYSQL_PASSWORD: spexflix
+      MYSQL_ROOT_PASSWORD: spexflix-root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - "127.0.0.1:3309:3306"
+    volumes:
+      - fgv_spexflix_mysql_data:/var/lib/mysql
+
+  spexflix-media:
+    image: 'nginx:1.29-alpine'
+    environment:
+      # The development key the API uses when MEDIA_SIGNING_KEY is not set
+      MEDIA_SIGNING_KEY: spexflix-development-signing-key
+      SPEXFLIX_WEB_ORIGIN: http://localhost:3003
+    ports:
+      - "127.0.0.1:8084:80"
+    volumes:
+      - ${SPEXFLIX_DEPLOY:-../fgv-spexflix-deploy}/media/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./data/media/hls:/media/hls:ro
+
+volumes:
+  fgv_spexflix_mysql_data:

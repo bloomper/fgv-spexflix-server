@@ -1,0 +1,293 @@
+scalar Instant
+scalar Void
+
+type Query {
+    "Anyone logged in. The caller and their roles."
+    me: Me!
+    "USER. The start page texts and the upload limit."
+    settings: Settings!
+    "USER. Videos by year, newest first. Unpublished, processing and failed ones only for EDITOR, when asked for."
+    videos(filter: VideoFilter): [Video!]!
+    "USER. A video; unpublished, unprocessed or trashed ones only for EDITOR."
+    video(id: ID!): Video
+    "USER. The most recently published videos."
+    recentVideos(limit: Int = 12): [Video!]!
+    "USER. Videos the caller has started but not finished, most recent first."
+    continueWatching(limit: Int = 12): [Video!]!
+    "USER. The caller's watch list."
+    watchList: [Video!]!
+    "USER. The categories of the published videos."
+    categories: [Category!]!
+    "USER. The years of the published videos, newest first."
+    years: [Int!]!
+    "USER. Videos whose titles, spex, descriptions, performances or chapters match."
+    search(q: String!): [Video!]!
+    "USER. Signed addresses for playing a ready video, valid for its duration plus a margin."
+    playback(videoId: ID!): Playback!
+    "EDITOR. Spex in Spexregister matching a title or year."
+    spexSearch(q: String!): [Spex!]!
+    "EDITOR. The published Spexify tracks of the video's spex, for linking chapters; empty when Spexify is unavailable."
+    spexifyTracks(videoId: ID!): [SpexifyTrack!]!
+    "SPEXIFY or USER. Chapters of published videos linked to the given Spexify tracks."
+    chapterLinks(trackIds: [ID!]!): [ChapterLink!]!
+    "EDITOR. Trashed videos."
+    trash: [Video!]!
+    "EDITOR. Running, waiting and recent processing jobs."
+    processingQueue: [ProcessingJob!]!
+    "ADMIN. Space used by originals and renditions, and left on the volume."
+    storage: Storage!
+    "EDITOR. The audit log: the caller's own changes, or everyone's for ADMIN."
+    auditLog(page: Int = 0, size: Int = 50): AuditPage!
+}
+
+type Mutation {
+    "EDITOR. New videos start unpublished, waiting for their file."
+    videoCreate(input: VideoInput!): Video!
+    "EDITOR."
+    videoUpdate(id: ID!, input: VideoInput!): Video!
+    "EDITOR. Takes a finished upload as the video's file, first or as a replacement, and queues it for processing."
+    videoSetFile(id: ID!, uploadId: String!): Video!
+    "EDITOR. Only READY videos can be published."
+    videoPublish(id: ID!, published: Boolean!): Video!
+    "EDITOR."
+    videoTrash(id: ID!): Video!
+    "EDITOR."
+    videoRestore(id: ID!): Video!
+    "ADMIN. Only a trashed video; deletes its files."
+    videoDelete(id: ID!): Void
+    "ADMIN. Deletes every trashed video with its files."
+    trashEmpty: Void
+    "EDITOR. Takes the poster from this point in the video."
+    videoPosterFrame(id: ID!, seconds: Float!): Video!
+    "ADMIN. Processes the original again."
+    videoReprocess(id: ID!): Video!
+    "EDITOR. Replaces the video's chapters."
+    chaptersSet(videoId: ID!, chapters: [ChapterInput!]!): Video!
+    "EDITOR."
+    subtitleRemove(videoId: ID!, language: String!): Video!
+    "USER. Where the caller is in a video; finished when near the end."
+    progressSave(videoId: ID!, positionSeconds: Int!): Void
+    "USER."
+    watchListAdd(videoId: ID!): Void
+    "USER."
+    watchListRemove(videoId: ID!): Void
+    "ADMIN."
+    settingsUpdate(input: SettingsInput!): Settings!
+}
+
+type Me {
+    username: String!
+    displayName: String
+    roles: [String!]!
+    "Whether the caller also has access to Spexify, for showing links there."
+    spexifyUser: Boolean!
+}
+
+type Settings {
+    welcomeSv: String
+    welcomeEn: String
+    maxUploadGb: Int!
+    "Whether originals are kept after processing, as the archive copy."
+    keepOriginals: Boolean!
+}
+
+input SettingsInput {
+    welcomeSv: String
+    welcomeEn: String
+    maxUploadGb: Int!
+    keepOriginals: Boolean!
+}
+
+enum VideoKind {
+    FULL_SHOW
+    NUMBER
+    TRAILER
+    BEHIND_THE_SCENES
+    OTHER
+}
+
+enum VideoStatus {
+    UPLOADING
+    PROCESSING
+    READY
+    FAILED
+}
+
+input VideoFilter {
+    categoryId: ID
+    year: Int
+    spexId: ID
+    kind: VideoKind
+    "EDITOR only."
+    includeUnpublished: Boolean
+}
+
+input VideoInput {
+    "A spex in Spexregister; without it the video is not about one spex."
+    spexId: ID
+    "Defaults to the spex title and year."
+    title: String
+    year: Int
+    kind: VideoKind!
+    "e.g. Premiere"
+    performance: String
+    "yyyy-mm-dd"
+    performanceDate: String
+    description: String
+}
+
+input ChapterInput {
+    startSeconds: Int!
+    title: String!
+    "A track in Spexify, from spexifyTracks."
+    spexifyTrackId: ID
+    spexifyTrackTitle: String
+}
+
+type Category {
+    id: ID!
+    name: String!
+    videoCount: Int!
+}
+
+type Spex {
+    id: ID!
+    title: String
+    year: Int
+    revival: Boolean!
+    categoryName: String
+}
+
+type VideoSpex {
+    id: ID!
+    title: String
+    year: Int
+    revival: Boolean
+    categoryId: ID
+    categoryName: String
+}
+
+type Video {
+    id: ID!
+    uuid: String!
+    title: String!
+    year: Int
+    kind: VideoKind!
+    performance: String
+    performanceDate: String
+    description: String
+    spex: VideoSpex
+    status: VideoStatus!
+    "Why processing failed."
+    failure: String
+    durationMs: Float
+    width: Int
+    height: Int
+    published: Boolean!
+    publishedAt: Instant
+    trashedAt: Instant
+    originalName: String
+    originalSize: Float
+    originalKept: Boolean!
+    hasThumbnails: Boolean!
+    posterSeconds: Float
+    renditions: [Rendition!]!
+    chapters: [Chapter!]!
+    subtitles: [Subtitle!]!
+    "The caller's position, in seconds, or null."
+    progressSeconds: Int
+    "Whether the caller has watched to the end."
+    finished: Boolean!
+    inWatchList: Boolean!
+    "The latest processing job, for EDITOR."
+    job: ProcessingJob
+    createdAt: Instant!
+    lastModifiedAt: Instant
+}
+
+type Rendition {
+    height: Int!
+    width: Int!
+    bitrateKbps: Int!
+    copied: Boolean!
+    size: Float!
+}
+
+type Chapter {
+    startSeconds: Int!
+    title: String!
+    spexifyTrackId: ID
+    spexifyTrackTitle: String
+}
+
+type Subtitle {
+    language: String!
+    label: String!
+}
+
+type Playback {
+    masterUrl: String!
+    "WebVTT index of the timeline thumbnails, or null."
+    thumbnailsUrl: String
+    subtitles: [PlaybackSubtitle!]!
+    expiresAt: Instant!
+}
+
+type PlaybackSubtitle {
+    language: String!
+    label: String!
+    url: String!
+}
+
+type SpexifyTrack {
+    id: ID!
+    title: String!
+    discNumber: Int!
+    trackNumber: Int!
+    albumTitle: String!
+}
+
+type ChapterLink {
+    trackId: ID!
+    videoId: ID!
+    videoTitle: String!
+    chapterTitle: String!
+    startSeconds: Int!
+}
+
+type ProcessingJob {
+    id: ID!
+    videoId: ID!
+    videoTitle: String!
+    status: String!
+    progress: Int!
+    attempts: Int!
+    error: String
+    createdAt: Instant!
+    startedAt: Instant
+    finishedAt: Instant
+}
+
+type Storage {
+    originalsBytes: Float!
+    renditionsBytes: Float!
+    freeBytes: Float!
+    videoCount: Int!
+}
+
+type AuditPage {
+    entries: [AuditLogEntry!]!
+    totalCount: Int!
+    page: Int!
+    size: Int!
+}
+
+type AuditLogEntry {
+    id: ID!
+    at: Instant!
+    actorName: String
+    action: String!
+    entityType: String!
+    entityId: ID
+    summary: String!
+}
