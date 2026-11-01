@@ -1,0 +1,144 @@
+= Spexflix Server GraphQL API Guide
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 4
+
+xref:index.adoc[Back to start page]
+
+[[schema]]
+== Schema
+
+The endpoint is ``/api/graphql``.
+If running locally, the corresponding URL is https://api.spexflix.fgv.local.nu:8443/api/graphql.
+
+Every operation requires an access token from the Keycloak client ``fgv-spexflix``, or from Spexify's service account ``fgv-spexify-service``.
+What each operation requires is in its description in the schema.
+
+Introspection is enabled only with the Spring profile ``local``.
+The schema can otherwise be downloaded, with an access token, from ``/api/graphql/schema``.
+Its source is ``src/main/resources/graphql/schema.graphqls``.
+
+[[errors]]
+== Errors
+
+The GraphQL API provides the error code in ``extensions.classification`` and a message in the request's language in ``message``:
+
+|===
+|Classification|Meaning
+
+|``UNAUTHORIZED``|The request has no valid access token.
+|``FORBIDDEN``|The user lacks the role the operation requires.
+|``NOT_FOUND``|The resource does not exist. Also returned for a video the user may not see.
+|``BAD_REQUEST``|The input breaks a rule, e.g. playing a video that is not ready.
+|``CONFLICT``|Someone else changed the resource since the user read it. Ask them to reload.
+|``SPEXREGISTER_UNAVAILABLE``|Spexregister cannot be reached. Everything that does not need it keeps working.
+|``DIRECTORY_UNAVAILABLE``|The FGV realm's users cannot be read in Keycloak.
+
+|===
+
+For example, publishing a video that does not exist produces an error:
+
+[source,json,options="nowrap"]
+----
+{
+    "errors": [
+        {
+            "message": "Filmen finns inte.",
+            "locations": [
+                {
+                    "line": 2,
+                    "column": 5
+                }
+            ],
+            "path": [
+                "videoPublish"
+            ],
+            "extensions": {
+                "classification": "NOT_FOUND"
+            }
+        }
+    ],
+    "data": null
+}
+----
+
+Note that invalid input according to the schema will be detected and reported as validation errors by the client which means that the structure is different from described above.
+
+[[roles]]
+== Roles
+
+Spexflix Server uses the following roles, which are client roles on ``fgv-spexflix`` in Keycloak:
+
+|===
+|Role|Description
+
+|USER|May use the application at all: watch, keep progress and a watch list; every operation requires it
+|EDITOR|Creates videos, uploads files, posters and subtitles, edits metadata and chapters, publishes and trashes
+|ADMIN|Everything an editor does, plus settings, storage and permanent deletes
+|SPEXIFY|Held only by Spexify's service account, which reads ``chapterLinks`` to show _Watch in Spexflix_
+
+|===
+
+Every service method resolves the caller and checks the role before it acts; GraphQL operations hold no rules of their own.
+``me`` returns the caller's roles, so clients can show or hide controls; the server enforces every rule anyway.
+
+[[videos]]
+== Videos and processing
+
+A video belongs to a spex in Spexregister and starts unpublished, waiting for its file.
+Its file is uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``videoSetFile``, which queues it.
+
+A worker, the same application with ``API_WORKER_ENABLED=true``, processes one job at a time, kept in the database so it survives restarts; a job whose lease runs out starts over.
+ffprobe reads the original; ffmpeg makes 1080p, 720p and 480p (never above the original), H.264 and AAC, 6-second segments with aligned keyframes, deinterlacing and loudness normalisation.
+An H.264/AAC original of at most 1080p is copied into the top rendition instead.
+Then come timeline thumbnails (sprites and a WebVTT index) and a poster frame.
+A new generation replaces the old only when complete, so a replaced video keeps playing.
+``processingQueue`` shows the jobs.
+
+Files live in the media folder (``API_MEDIA_ROOT``), never in the database:
+
+|===
+|Path|Content
+
+|``originals/<uuid>/original.<ext>``|The uploaded file, the archive copy; never served
+|``originals/<uuid>/pending-<n>.<ext>``|A replacement waiting to be processed
+|``hls/<uuid>/<generation>/``|``master.m3u8``, one folder per rendition, ``thumbs/``, ``poster.jpg``
+|``hls/<uuid>/subtitles/<lang>.vtt``|Subtitles, kept across generations
+|``uploads/``|Unfinished uploads, kept 24 hours
+
+|===
+
+[[playback]]
+== Playback
+
+``playback(videoId)`` returns signed, expiring addresses on the media server for the HLS playlist, the timeline thumbnails and the subtitles, valid for the video's duration plus four hours.
+How they are signed is described under xref:api-guide.adoc#media_server[Media server].
+Progress (``progressSave``) and the watch list are per user.
+
+[[audit]]
+== Audit
+
+Editors' changes are recorded in the audit log (``auditLog``): who, when, what and a summary.
+Editors see their own changes, admins everyone's.
+
+[[spexregister]]
+== Spexregister
+
+Spex, their categories and posters are read from Spexregister, which Spexflix Server calls as the service account ``fgv-spexflix-service`` with Spexregister's ``MEDIA`` role.
+A video keeps a copy of its spex's title and year, so the catalogue works while Spexregister is down; only ``spexSearch`` and posters fail, with ``SPEXREGISTER_UNAVAILABLE``.
+
+[[spexify]]
+== Spexify
+
+Editors link chapters to Spexify's published tracks: ``spexifyTracks`` reads Spexify's ``spexTracks`` as ``fgv-spexflix-service`` with Spexify's ``SPEXFLIX`` role.
+Spexify asks ``chapterLinks(trackIds)`` with the ``SPEXIFY`` role to show _Watch in Spexflix_.
+Without ``API_SPEXIFY_GRAPHQL_URL``, ``spexifyTracks`` is empty.
+
+[[file_handling]]
+== File handling
+
+As GraphQL does not have any native support for uploading/downloading files, those operations are done via the xref:api-guide.adoc[HTTP API]: posters, subtitles and uploads.
+
+xref:index.adoc[Back to start page]

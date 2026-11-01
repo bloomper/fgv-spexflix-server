@@ -1,0 +1,131 @@
+spring:
+  config:
+    import: "optional:configtree:/run/secrets/"
+  datasource:
+    password: ${MYSQL_API_USER_PASSWORD:}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        # Loads the collections of many videos in one query, not one per video
+        default_batch_fetch_size: 100
+        transaction:
+          jta:
+            platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+    encoding: UTF-8
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${spexflix.keycloak.url}/realms/${spexflix.keycloak.realm}
+      client:
+        registration:
+          fgv-spexflix-service:
+            provider: fgv
+            client-id: ${API_KEYCLOAK_SERVICE_CLIENT_ID:fgv-spexflix-service}
+            client-secret: ${API_KEYCLOAK_SERVICE_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+        provider:
+          fgv:
+            token-uri: ${spexflix.keycloak.url}/realms/${spexflix.keycloak.realm}/protocol/openid-connect/token
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  web:
+    locale: sv
+  graphql:
+    schema:
+      printer:
+        enabled: true
+      introspection:
+        enabled: false
+    http:
+      path: /api/graphql
+
+management:
+  server:
+    port: 9000
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  tomcat:
+    # tus chunks are at most 50 MB
+    max-swallow-size: 60MB
+
+logging:
+  file:
+    path: ./data/log_data
+
+spexflix:
+  time-zone: Europe/Stockholm
+  keycloak:
+    url: ${API_KEYCLOAK_URL:https://auth.fgv.local.nu:8443/auth}
+    realm: ${API_KEYCLOAK_REALM:fgv}
+    # Only for the sample data import, which creates users
+    admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
+    admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
+  security:
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service}
+  media:
+    root: ${API_MEDIA_ROOT:./data/media}
+    max-upload-size: ${API_MAX_UPLOAD_SIZE:50GB}
+    # The DNS-only media hostname served by spexflix-media (nginx)
+    base-url: ${API_MEDIA_BASE_URL:https://media.spexflix.fgv.local.nu:8443}
+    # Shared with spexflix-media, which checks the signed playback addresses
+    signing-key: ${API_MEDIA_SIGNING_KEY:}
+    link-margin: 4h
+  worker:
+    enabled: ${API_WORKER_ENABLED:false}
+    priority: 10
+  spexregister:
+    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  spexify:
+    graphql-url: ${API_SPEXIFY_GRAPHQL_URL:}
+  data:
+    import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
+    sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
+    sample-data-preprocessed: ${API_SAMPLE_DATA_PREPROCESSED:false}
+    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  graphql:
+    schema:
+      introspection:
+        enabled: true
+  # The password comes from MYSQL_API_USER_PASSWORD, as in the container
+  datasource:
+    url: jdbc:mysql://localhost:3309/spexflix
+    username: spexflix
+
+server:
+  port: 8083
+
+management:
+  server:
+    port: 9003
+
+spexflix:
+  keycloak:
+    url: https://auth.fgv.local.nu:8443/auth
+  media:
+    base-url: http://localhost:8084
+    # A key for development only; every other environment sets API_MEDIA_SIGNING_KEY
+    signing-key: ${API_MEDIA_SIGNING_KEY:spexflix-development-signing-key}
+  worker:
+    enabled: true
