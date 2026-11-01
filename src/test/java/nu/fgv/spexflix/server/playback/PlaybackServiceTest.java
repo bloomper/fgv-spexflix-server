@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -87,6 +88,7 @@ class PlaybackServiceTest {
                 new PlaybackSigner(properties), properties, Clock.fixed(NOW, ZoneOffset.UTC));
         video = new Video();
         video.setId(1L);
+        video.setUuid(uuid(1));
         video.setTitle("Cleopatra");
         video.setStatus(VideoStatus.READY);
         video.setPublished(true);
@@ -94,7 +96,7 @@ class PlaybackServiceTest {
         video.setGeneration(2);
         tina = new AppUser();
         tina.setId(5L);
-        lenient().when(videoService.visible(1L)).thenReturn(video);
+        lenient().when(videoService.visible(uuid(1))).thenReturn(video);
         lenient().when(callerService.current()).thenReturn(TestCallers.viewer());
         lenient().when(callerService.record(any())).thenReturn(tina);
     }
@@ -108,7 +110,7 @@ class PlaybackServiceTest {
         video.getSubtitles().add(subtitle);
         video.setHasThumbnails(true);
 
-        final PlaybackService.PlaybackDto playback = service.playback(1L);
+        final PlaybackService.PlaybackDto playback = service.playback(uuid(1));
 
         assertThat(playback.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(10)).plus(Duration.ofHours(4)));
         assertThat(playback.masterUrl()).startsWith("https://media.test/v/" + playback.expiresAt().getEpochSecond() + "/")
@@ -120,10 +122,10 @@ class PlaybackServiceTest {
     @Test
     void aVideoWithoutRenditionsCannotBePlayedButAReplacementInProgressCan() {
         video.setStatus(VideoStatus.PROCESSING);
-        assertThatThrownBy(() -> service.playback(1L)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.playback(uuid(1))).isInstanceOf(BadRequestException.class);
 
         video.getRenditions().add(new Rendition());
-        assertThat(service.playback(1L).thumbnailsUrl()).isNull();
+        assertThat(service.playback(uuid(1)).thumbnailsUrl()).isNull();
     }
 
     @Test
@@ -131,9 +133,9 @@ class PlaybackServiceTest {
         final ArgumentCaptor<WatchProgress> saved = ArgumentCaptor.forClass(WatchProgress.class);
 
         when(progressRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.empty());
-        service.saveProgress(1L, 100);
-        service.saveProgress(1L, 590);
-        service.saveProgress(1L, 9999);
+        service.saveProgress(uuid(1), 100);
+        service.saveProgress(uuid(1), 590);
+        service.saveProgress(uuid(1), 9999);
         verify(progressRepository, org.mockito.Mockito.times(3)).save(saved.capture());
 
         assertThat(saved.getAllValues()).extracting(WatchProgress::getPositionSeconds).containsExactly(100, 590, 600);
@@ -166,11 +168,12 @@ class PlaybackServiceTest {
         final WatchListEntry entry = new WatchListEntry();
 
         when(watchListRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.empty()).thenReturn(Optional.of(entry));
-        service.watchListAdd(1L);
-        service.watchListAdd(1L);
+        service.watchListAdd(uuid(1));
+        service.watchListAdd(uuid(1));
         verify(watchListRepository, org.mockito.Mockito.times(1)).save(any());
 
-        service.watchListRemove(1L);
+        when(videoRepository.findByUuid(uuid(1))).thenReturn(Optional.of(video));
+        service.watchListRemove(uuid(1));
         verify(watchListRepository).delete(entry);
     }
 
@@ -178,7 +181,7 @@ class PlaybackServiceTest {
     void personalStateIsEmptyWithoutAUser() {
         when(callerService.currentIfAny()).thenReturn(Optional.empty());
 
-        assertThat(service.personal(Set.of(1L)).watchList()).isEmpty();
+        assertThat(service.personal(Set.of(uuid(1))).watchList()).isEmpty();
         verify(progressRepository, never()).findByUserIdAndVideoIdIn(any(), any());
     }
 }

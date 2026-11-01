@@ -172,8 +172,10 @@ The import needs the secret of ``fgv-admin``.
 
 The sample data is built on Spexregister's, so Spexregister must run with ``API_IMPORT_SAMPLE_DATA=true``:
 
-* The albums belong to Spexregister's sample spex, read from its API. The import waits up to 5 minutes for Spexregister.
-* Spexregister's sample users get roles on ``fgv-spexflix`` (see <<test_credentials>>). The import refuses to run without them, which keeps it away from real environments.
+* The albums belong to Spexregister's sample spex, read from its API.
+The import waits up to 5 minutes for Spexregister.
+* Spexregister's sample users get roles on ``fgv-spexflix`` (see <<test_credentials>>).
+The import refuses to run without them, which keeps it away from real environments.
 
 [sidebar]
 .NOTE

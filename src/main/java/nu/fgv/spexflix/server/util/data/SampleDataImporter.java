@@ -107,19 +107,19 @@ public class SampleDataImporter {
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
     private static final String SUBTITLES_SV = """
             WEBVTT
-
+            
             00:00:01.000 --> 00:00:04.000
             Här står vi nu på scenen
-
+            
             00:00:05.000 --> 00:00:08.000
             med kronor och med svärd.
             """;
     private static final String SUBTITLES_EN = """
             WEBVTT
-
+            
             00:00:01.000 --> 00:00:04.000
             Here we stand upon the stage
-
+            
             00:00:05.000 --> 00:00:08.000
             with crowns and with swords.
             """;
@@ -172,6 +172,31 @@ public class SampleDataImporter {
         this.clock = clock;
     }
 
+    private static UserRepresentation spexregisterUser(final RealmResource realm, final String email) {
+        return realm.users().searchByEmail(email, true).stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("Spexregister's sample user " + email
+                        + " is missing; start Spexregister with its sample data first"));
+    }
+
+    private static void addSubtitle(final Video video, final String language, final String label) {
+        final Subtitle subtitle = new Subtitle();
+
+        subtitle.setVideo(video);
+        subtitle.setLanguage(language);
+        subtitle.setLabel(label);
+        video.getSubtitles().add(subtitle);
+    }
+
+    private static String label(final VideoKind kind) {
+        return switch (kind) {
+            case FULL_SHOW -> "föreställning";
+            case NUMBER -> "nummer";
+            case TRAILER -> "trailer";
+            case BEHIND_THE_SCENES -> "bakom kulisserna";
+            case OTHER -> "övrigt";
+        };
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.LOWEST_PRECEDENCE)
     public void onReady() throws IOException {
@@ -183,6 +208,8 @@ public class SampleDataImporter {
         }
         importSampleData();
     }
+
+    // ---------------------------------------------------------------------------------------------------- users
 
     public void importSampleData() throws IOException {
         final long started = System.nanoTime();
@@ -275,8 +302,6 @@ public class SampleDataImporter {
         }
     }
 
-    // ---------------------------------------------------------------------------------------------------- users
-
     /**
      * Gives Spexregister's sample users {@code admin@fgv.nu}, {@code editor@fgv.nu} and {@code user@fgv.nu} the roles
      * of the same name on this client, and creates {@code no-access@fgv.nu}, without roles, when it is missing. Refuses
@@ -294,12 +319,6 @@ public class SampleDataImporter {
         return users;
     }
 
-    private static UserRepresentation spexregisterUser(final RealmResource realm, final String email) {
-        return realm.users().searchByEmail(email, true).stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Spexregister's sample user " + email
-                        + " is missing; start Spexregister with its sample data first"));
-    }
-
     private AppUser grant(final RealmResource realm, final ClientResource client, final String clientUuid,
                           final UserRepresentation user, final String... roles) {
         final List<RoleRepresentation> representations = Arrays.stream(roles)
@@ -309,6 +328,8 @@ public class SampleDataImporter {
         realm.users().get(user.getId()).roles().clientLevel(clientUuid).add(representations);
         return recordUser(user);
     }
+
+    // ---------------------------------------------------------------------------------------------------- videos
 
     private AppUser recordUser(final UserRepresentation representation) {
         final Instant now = clock.instant();
@@ -354,8 +375,6 @@ public class SampleDataImporter {
         }
     }
 
-    // ---------------------------------------------------------------------------------------------------- videos
-
     /**
      * Creates a video with its original in place and, when asked, a queued job.
      *
@@ -366,7 +385,7 @@ public class SampleDataImporter {
         final Video video = new Video();
         final VideoKind kind = index < spex.size() ? VideoKind.FULL_SHOW : VideoKind.values()[index % VideoKind.values().length];
 
-        video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)).toString());
+        video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)));
         spexService.copy(picked, video.getSpex());
         video.setKind(kind);
         video.setTitle(kind == VideoKind.FULL_SHOW ? String.valueOf(picked.title()) : picked.title() + " – " + label(kind));
@@ -415,7 +434,7 @@ public class SampleDataImporter {
         return job.getId();
     }
 
-    private void addChapters(final Video video, final Long spexId) {
+    private void addChapters(final Video video, final UUID spexId) {
         final List<SpexifyClient.Track> tracks = spexifyClient.tracks(spexId);
 
         for (int i = 0; i < 5; i++) {
@@ -425,19 +444,10 @@ public class SampleDataImporter {
             chapter.setVideo(video);
             chapter.setStartSeconds(i * 10);
             chapter.setTitle(track != null ? track.title() : CHAPTERS.get(i));
-            chapter.setSpexifyTrackId(track == null ? null : Long.valueOf(track.id()));
+            chapter.setSpexifyTrackId(track == null ? null : UUID.fromString(track.id()));
             chapter.setSpexifyTrackTitle(track == null ? null : track.title());
             video.getChapters().add(chapter);
         }
-    }
-
-    private static void addSubtitle(final Video video, final String language, final String label) {
-        final Subtitle subtitle = new Subtitle();
-
-        subtitle.setVideo(video);
-        subtitle.setLanguage(language);
-        subtitle.setLabel(label);
-        video.getSubtitles().add(subtitle);
     }
 
     /**
@@ -472,16 +482,6 @@ public class SampleDataImporter {
                 to.getRenditions().add(copy);
             });
         });
-    }
-
-    private static String label(final VideoKind kind) {
-        return switch (kind) {
-            case FULL_SHOW -> "föreställning";
-            case NUMBER -> "nummer";
-            case TRAILER -> "trailer";
-            case BEHIND_THE_SCENES -> "bakom kulisserna";
-            case OTHER -> "övrigt";
-        };
     }
 
     private void createViewing(final AppUser user) {
@@ -522,7 +522,7 @@ public class SampleDataImporter {
             entry.setActorName(editor.getDisplayName());
             entry.setAction("UPLOAD");
             entry.setEntityType("VIDEO");
-            entry.setEntityId(video.getId());
+            entry.setEntityId(video.getUuid().toString());
             entry.setSummary("Laddade upp filen till " + video.getTitle());
             auditRepository.save(entry);
         }

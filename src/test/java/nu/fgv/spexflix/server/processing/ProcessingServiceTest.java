@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,6 +66,7 @@ class ProcessingServiceTest {
         final ProcessingJob job = new ProcessingJob();
 
         video.setId(id);
+        video.setUuid(uuid(id));
         video.setTitle("Video " + id);
         job.setId(id);
         job.setVideo(video);
@@ -84,7 +86,7 @@ class ProcessingServiceTest {
         when(callerService.current()).thenReturn(TestCallers.editor());
         when(jobRepository.findRecent(any())).thenReturn(List.of(job(1L, Instant.now()), job(2L, null)));
 
-        assertThat(service.queue()).extracting(ProcessingService.JobDto::videoId).containsExactly(2L, 1L);
+        assertThat(service.queue()).extracting(ProcessingService.JobDto::videoId).containsExactly(uuid(2), uuid(1));
 
         when(callerService.current()).thenReturn(TestCallers.viewer());
         assertThatThrownBy(() -> service.queue()).isInstanceOf(AccessDeniedException.class);
@@ -93,11 +95,15 @@ class ProcessingServiceTest {
     @Test
     void theLatestJobsAreOnlyForEditors() {
         when(callerService.currentIfAny()).thenReturn(Optional.of(TestCallers.viewer()));
-        assertThat(service.latest(List.of(1L))).isEmpty();
+        assertThat(service.latest(List.of(uuid(1)))).isEmpty();
 
         when(callerService.currentIfAny()).thenReturn(Optional.of(TestCallers.editor()));
-        when(jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(1L)).thenReturn(Optional.of(job(1L, null)));
-        assertThat(service.latest(List.of(1L, 2L))).containsOnlyKeys(1L);
+        final ProcessingJob first = job(1L, null);
+        final ProcessingJob second = job(2L, null);
+
+        when(videoRepository.findByUuidIn(List.of(uuid(1), uuid(2)))).thenReturn(List.of(first.getVideo(), second.getVideo()));
+        when(jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(1L)).thenReturn(Optional.of(first));
+        assertThat(service.latest(List.of(uuid(1), uuid(2)))).containsOnlyKeys(uuid(1));
     }
 
     @Test

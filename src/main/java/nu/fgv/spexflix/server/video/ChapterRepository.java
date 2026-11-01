@@ -22,6 +22,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Repository for {@link Chapter}.
@@ -39,5 +40,5 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
             WHERE c.spexifyTrackId IN :trackIds AND v.trashedAt IS NULL AND v.published = TRUE
               AND v.status = nu.fgv.spexflix.server.video.VideoStatus.READY
             ORDER BY v.year DESC, c.startSeconds ASC""")
-    List<Chapter> findListedByTracks(@Param("trackIds") Collection<Long> trackIds);
+    List<Chapter> findListedByTracks(@Param("trackIds") Collection<UUID> trackIds);
 }

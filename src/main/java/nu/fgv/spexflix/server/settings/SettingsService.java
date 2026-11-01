@@ -49,6 +49,15 @@ public class SettingsService {
         this.clock = clock;
     }
 
+    private static @Nullable String text(final @Nullable String value) {
+        return StringUtils.hasText(value) ? value.strip() : null;
+    }
+
+    private static SettingsDto toDto(final Settings settings) {
+        return new SettingsDto(settings.getWelcomeSv(), settings.getWelcomeEn(), settings.getMaxUploadGb(),
+                settings.isKeepOriginals());
+    }
+
     /**
      * The settings, without checking the caller, for the gateway and other services.
      */
@@ -83,15 +92,6 @@ public class SettingsService {
         repository.save(settings);
         auditService.record("UPDATE", "SETTINGS", null, "Ändrade inställningarna");
         return toDto(settings);
-    }
-
-    private static @Nullable String text(final @Nullable String value) {
-        return StringUtils.hasText(value) ? value.strip() : null;
-    }
-
-    private static SettingsDto toDto(final Settings settings) {
-        return new SettingsDto(settings.getWelcomeSv(), settings.getWelcomeEn(), settings.getMaxUploadGb(),
-                settings.isKeepOriginals());
     }
 
     /**

@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
+import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -90,6 +91,13 @@ class MediaHttpApiTest extends AbstractApiTest {
 
     private Video video;
 
+    private static VideoDto videoDto() {
+        return new VideoDto(uuid(1), "Cleopatra", 2024, VideoKind.FULL_SHOW, "Premiären",
+                "2024-02-14", null, null, VideoStatus.READY, null, 7_200_000d, 1920, 1080, true,
+                Instant.parse("2026-10-01T10:00:00Z"), null, "cleopatra.mkv", 4_000_000_000d, true, true, 600d,
+                List.of(), List.of(), List.of(), Instant.parse("2026-09-30T10:00:00Z"), null);
+    }
+
     @BeforeEach
     void setUpVideo() throws IOException {
         video = new Video();
@@ -102,10 +110,10 @@ class MediaHttpApiTest extends AbstractApiTest {
 
     @Test
     void servesAPoster() throws Exception {
-        when(videoService.visible(1L)).thenReturn(video);
+        when(videoService.visible(uuid(1))).thenReturn(video);
 
         mockMvc
-                .perform(get("/api/videos/{id}/poster", 1L).header(HttpHeaders.AUTHORIZATION, BEARER))
+                .perform(get("/api/videos/{id}/poster", uuid(1)).header(HttpHeaders.AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
                 .andDo(document(
@@ -122,10 +130,10 @@ class MediaHttpApiTest extends AbstractApiTest {
 
     @Test
     void uploadsAPoster() throws Exception {
-        when(videoService.posterUpload(eq(1L), any())).thenReturn(videoDto());
+        when(videoService.posterUpload(eq(uuid(1)), any())).thenReturn(videoDto());
 
         mockMvc
-                .perform(multipart("/api/videos/{id}/poster", 1L)
+                .perform(multipart("/api/videos/{id}/poster", uuid(1))
                         .file(new MockMultipartFile("file", "poster.jpg", "image/jpeg", JPEG))
                         .header(HttpHeaders.AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
@@ -142,10 +150,10 @@ class MediaHttpApiTest extends AbstractApiTest {
 
     @Test
     void uploadsASubtitle() throws Exception {
-        when(videoService.subtitleSet(eq(1L), eq("sv"), eq("Svenska"), any())).thenReturn(videoDto());
+        when(videoService.subtitleSet(eq(uuid(1)), eq("sv"), eq("Svenska"), any())).thenReturn(videoDto());
 
         mockMvc
-                .perform(multipart("/api/videos/{id}/subtitles", 1L)
+                .perform(multipart("/api/videos/{id}/subtitles", uuid(1))
                         .file(new MockMultipartFile("file", "cleopatra.srt", "application/x-subrip",
                                 "1\n00:00:01,000 --> 00:00:04,500\nOuvertyr\n".getBytes(StandardCharsets.UTF_8)))
                         .param("language", "sv")
@@ -165,10 +173,10 @@ class MediaHttpApiTest extends AbstractApiTest {
 
     @Test
     void aVideoTheCallerMayNotSeeIsNotFound() throws Exception {
-        when(videoService.visible(2L)).thenThrow(new ResourceNotFoundException(Video.class, 2L));
+        when(videoService.visible(uuid(2))).thenThrow(new ResourceNotFoundException(Video.class, uuid(2)));
 
         mockMvc
-                .perform(get("/api/videos/{id}/poster", 2L).header(HttpHeaders.AUTHORIZATION, BEARER))
+                .perform(get("/api/videos/{id}/poster", uuid(2)).header(HttpHeaders.AUTHORIZATION, BEARER))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andDo(document(
@@ -178,40 +186,33 @@ class MediaHttpApiTest extends AbstractApiTest {
                 ));
     }
 
-    private static VideoDto videoDto() {
-        return new VideoDto(1L, "0f4e2b7c-4d6f-3c1d-9a51-6f0f0c9a0b5e", "Cleopatra", 2024, VideoKind.FULL_SHOW, "Premiären",
-                "2024-02-14", null, null, VideoStatus.READY, null, 7_200_000d, 1920, 1080, true,
-                Instant.parse("2026-10-01T10:00:00Z"), null, "cleopatra.mkv", 4_000_000_000d, true, true, 600d,
-                List.of(), List.of(), List.of(), Instant.parse("2026-09-30T10:00:00Z"), null);
-    }
-
     @Test
     void withoutAnUploadedPosterTheFrameOrTheSpexPosterIsShown() throws Exception {
         video.setPosterUploaded(false);
-        when(videoService.visible(1L)).thenReturn(video);
+        when(videoService.visible(uuid(1))).thenReturn(video);
         when(storage.poster(video)).thenReturn(Files.write(folder.resolve("frame.jpg"), JPEG));
-        mockMvc.perform(get("/api/videos/{id}/poster", 1L)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk());
 
         when(storage.poster(video)).thenReturn(folder.resolve("missing.jpg"));
-        video.getSpex().setId(7L);
-        when(spexService.poster(7L)).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexregisterClient.Poster(JPEG, "image/jpeg")));
-        mockMvc.perform(get("/api/videos/{id}/poster", 1L)).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"));
+        video.getSpex().setId(uuid(7));
+        when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexregisterClient.Poster(JPEG, "image/jpeg")));
+        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"));
 
-        when(spexService.poster(7L)).thenReturn(java.util.Optional.empty());
-        mockMvc.perform(get("/api/videos/{id}/poster", 1L)).andExpect(status().isNotFound());
+        when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.empty());
+        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isNotFound());
 
         video.getSpex().setId(null);
-        mockMvc.perform(get("/api/videos/{id}/poster", 1L)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isNotFound());
     }
 
     @Test
     void anythingButAnImageOrSubtitlesIsRefused() throws Exception {
-        mockMvc.perform(multipart("/api/videos/{id}/poster", 1L).file(new MockMultipartFile("file", "p.jpg", "image/jpeg", "<svg/>".getBytes())))
+        mockMvc.perform(multipart("/api/videos/{id}/poster", uuid(1)).file(new MockMultipartFile("file", "p.jpg", "image/jpeg", "<svg/>".getBytes())))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(multipart("/api/videos/{id}/subtitles", 1L).file(new MockMultipartFile("file", "s.srt", "text/plain", "bara text".getBytes()))
+        mockMvc.perform(multipart("/api/videos/{id}/subtitles", uuid(1)).file(new MockMultipartFile("file", "s.srt", "text/plain", "bara text".getBytes()))
                         .param("language", "sv").param("label", "Svenska"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(multipart("/api/videos/{id}/subtitles", 1L).file(new MockMultipartFile("file", "s.srt", "text/plain", new byte[0]))
+        mockMvc.perform(multipart("/api/videos/{id}/subtitles", uuid(1)).file(new MockMultipartFile("file", "s.srt", "text/plain", new byte[0]))
                         .param("language", "sv").param("label", "Svenska"))
                 .andExpect(status().isBadRequest());
     }

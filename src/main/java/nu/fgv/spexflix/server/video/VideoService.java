@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * The catalogue of videos: reading them as the caller may see them, and editing them. Files are taken from finished
@@ -98,6 +99,10 @@ public class VideoService {
 
     // ---------------------------------------------------------------------------------------------------- reading
 
+    private static String limit(final String value) {
+        return value.length() > MAX_TEXT ? value.substring(0, MAX_TEXT) : value;
+    }
+
     @Transactional(readOnly = true)
     public List<VideoDto> videos(final @Nullable VideoFilter filter) {
         final Caller caller = callerService.current();
@@ -116,11 +121,11 @@ public class VideoService {
     }
 
     @Transactional(readOnly = true)
-    public @Nullable VideoDto video(final Long id) {
+    public @Nullable VideoDto video(final UUID id) {
         final Caller caller = callerService.current();
 
         caller.requireUser();
-        return videoRepository.findById(id)
+        return videoRepository.findByUuid(id)
                 .filter(video -> video.isListed() || caller.isEditor())
                 .map(VideoDtos::toDto)
                 .orElse(null);
@@ -130,12 +135,12 @@ public class VideoService {
      * A video the caller may see, for playback and posters.
      */
     @Transactional(readOnly = true)
-    public Video visible(final Long id) {
+    public Video visible(final UUID id) {
         final Caller caller = callerService.current();
 
         caller.requireUser();
 
-        final Video video = videoRepository.findById(id)
+        final Video video = videoRepository.findByUuid(id)
                 .filter(candidate -> candidate.isListed() || caller.isEditor())
                 .orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
 
@@ -153,11 +158,11 @@ public class VideoService {
     public List<CategoryDto> categories() {
         callerService.current().requireUser();
 
-        final Map<Long, String> names = new HashMap<>();
-        final Map<Long, Integer> counts = new HashMap<>();
+        final Map<UUID, String> names = new HashMap<>();
+        final Map<UUID, Integer> counts = new HashMap<>();
 
         for (final Video video : videoRepository.findListed()) {
-            final Long categoryId = video.getSpex().getCategoryId();
+            final UUID categoryId = video.getSpex().getCategoryId();
 
             if (categoryId != null) {
                 names.put(categoryId, Objects.requireNonNullElse(video.getSpex().getCategoryName(), "?"));
@@ -192,13 +197,13 @@ public class VideoService {
                 .stream().limit(50).map(VideoDtos::toDto).toList();
     }
 
+    // ---------------------------------------------------------------------------------------------------- editing
+
     @Transactional(readOnly = true)
     public List<VideoDto> trash() {
         callerService.current().requireEditor();
         return videoRepository.findByTrashedAtIsNotNullOrderByTrashedAtDesc().stream().map(VideoDtos::toDto).toList();
     }
-
-    // ---------------------------------------------------------------------------------------------------- editing
 
     @Transactional
     public VideoDto create(final VideoInput input) {
@@ -208,18 +213,18 @@ public class VideoService {
 
         apply(video, input);
         videoRepository.save(video);
-        auditService.record("CREATE", "VIDEO", video.getId(), "Skapade filmen " + video.getTitle());
+        auditService.record("CREATE", "VIDEO", video.getUuid(), "Skapade filmen " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto update(final Long id, final VideoInput input) {
+    public VideoDto update(final UUID id, final VideoInput input) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
 
         apply(video, input);
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Ändrade filmen " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Ändrade filmen " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
@@ -256,14 +261,14 @@ public class VideoService {
      * beside the original until the worker has processed it; the old renditions play until then.
      */
     @Transactional
-    public VideoDto setFile(final Long id, final String uploadId) {
+    public VideoDto setFile(final UUID id, final String uploadId) {
         final Caller caller = callerService.current();
 
         caller.requireEditor();
 
         final Video video = editable(id);
 
-        if (jobRepository.existsByVideoIdAndStatusIn(id, EnumSet.of(JobStatus.QUEUED, JobStatus.RUNNING))) {
+        if (jobRepository.existsByVideoIdAndStatusIn(video.getId(), EnumSet.of(JobStatus.QUEUED, JobStatus.RUNNING))) {
             throw new BadRequestException("error.video.processing");
         }
 
@@ -301,13 +306,13 @@ public class VideoService {
         job.setSource(storage.root().relativize(target).toString());
         job.setCreatedAt(clock.instant());
         jobRepository.save(job);
-        auditService.record(first ? "UPLOAD" : "REPLACE", "VIDEO", video.getId(),
+        auditService.record(first ? "UPLOAD" : "REPLACE", "VIDEO", video.getUuid(),
                 (first ? "Laddade upp filen till " : "Bytte filen för ") + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto reprocess(final Long id) {
+    public VideoDto reprocess(final UUID id) {
         callerService.current().requireAdmin();
 
         final Video video = editable(id);
@@ -315,7 +320,7 @@ public class VideoService {
         if (video.getOriginalExtension() == null || !Files.isRegularFile(storage.original(video))) {
             throw new BadRequestException("error.video.noOriginal");
         }
-        if (jobRepository.existsByVideoIdAndStatusIn(id, EnumSet.of(JobStatus.QUEUED, JobStatus.RUNNING))) {
+        if (jobRepository.existsByVideoIdAndStatusIn(video.getId(), EnumSet.of(JobStatus.QUEUED, JobStatus.RUNNING))) {
             throw new BadRequestException("error.video.processing");
         }
 
@@ -328,12 +333,12 @@ public class VideoService {
         if (video.getStatus() != VideoStatus.READY) {
             video.setStatus(VideoStatus.PROCESSING);
         }
-        auditService.record("REPROCESS", "VIDEO", video.getId(), "Bearbetar om " + video.getTitle());
+        auditService.record("REPROCESS", "VIDEO", video.getUuid(), "Bearbetar om " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto publish(final Long id, final boolean published) {
+    public VideoDto publish(final UUID id, final boolean published) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -345,28 +350,28 @@ public class VideoService {
         if (published && video.getPublishedAt() == null) {
             video.setPublishedAt(clock.instant());
         }
-        auditService.record(published ? "PUBLISH" : "UNPUBLISH", "VIDEO", video.getId(),
+        auditService.record(published ? "PUBLISH" : "UNPUBLISH", "VIDEO", video.getUuid(),
                 (published ? "Publicerade " : "Avpublicerade ") + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto trash(final Long id, final boolean trashed) {
+    public VideoDto trash(final UUID id, final boolean trashed) {
         callerService.current().requireEditor();
 
-        final Video video = videoRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
+        final Video video = videoRepository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
 
         video.setTrashedAt(trashed ? clock.instant() : null);
-        auditService.record(trashed ? "TRASH" : "RESTORE", "VIDEO", video.getId(),
+        auditService.record(trashed ? "TRASH" : "RESTORE", "VIDEO", video.getUuid(),
                 (trashed ? "Lade i papperskorgen: " : "Återställde ") + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public void delete(final Long id) {
+    public void delete(final UUID id) {
         callerService.current().requireAdmin();
 
-        final Video video = videoRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
+        final Video video = videoRepository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
 
         if (!video.isTrashed()) {
             throw new BadRequestException("error.video.notTrashed");
@@ -386,7 +391,7 @@ public class VideoService {
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-        auditService.record("DELETE", "VIDEO", video.getId(), "Raderade " + video.getTitle());
+        auditService.record("DELETE", "VIDEO", video.getUuid(), "Raderade " + video.getTitle());
         videoRepository.delete(video);
     }
 
@@ -394,7 +399,7 @@ public class VideoService {
      * Takes the poster from a point in the video, from the original or, when it is not kept, the top rendition.
      */
     @Transactional
-    public VideoDto posterFrame(final Long id, final double seconds) {
+    public VideoDto posterFrame(final UUID id, final double seconds) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -415,12 +420,12 @@ public class VideoService {
         }
         video.setPosterSeconds(seconds);
         video.setPosterUploaded(false);
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Bytte affischbild för " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Bytte affischbild för " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto posterUpload(final Long id, final byte[] jpeg) {
+    public VideoDto posterUpload(final UUID id, final byte[] jpeg) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -432,12 +437,12 @@ public class VideoService {
             throw new UncheckedIOException(e);
         }
         video.setPosterUploaded(true);
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Laddade upp affischbild för " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Laddade upp affischbild för " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto setChapters(final Long id, final List<ChapterInput> inputs) {
+    public VideoDto setChapters(final UUID id, final List<ChapterInput> inputs) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -456,12 +461,12 @@ public class VideoService {
             chapter.setSpexifyTrackTitle(input.spexifyTrackTitle() == null ? null : limit(input.spexifyTrackTitle()));
             video.getChapters().add(chapter);
         });
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Ändrade kapitlen i " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Ändrade kapitlen i " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto subtitleSet(final Long id, final String language, final String label, final byte[] vtt) {
+    public VideoDto subtitleSet(final UUID id, final String language, final String label, final byte[] vtt) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -488,12 +493,12 @@ public class VideoService {
         });
 
         subtitle.setLabel(limit(label.strip()));
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Laddade upp undertexter (" + language + ") till " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Laddade upp undertexter (" + language + ") till " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
     @Transactional
-    public VideoDto subtitleRemove(final Long id, final String language) {
+    public VideoDto subtitleRemove(final UUID id, final String language) {
         callerService.current().requireEditor();
 
         final Video video = editable(id);
@@ -504,20 +509,16 @@ public class VideoService {
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Tog bort undertexter (" + language + ") från " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Tog bort undertexter (" + language + ") från " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
-    private Video editable(final Long id) {
-        final Video video = videoRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
+    private Video editable(final UUID id) {
+        final Video video = videoRepository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
 
         if (video.isTrashed()) {
             throw new BadRequestException("error.video.trashed");
         }
         return video;
-    }
-
-    private static String limit(final String value) {
-        return value.length() > MAX_TEXT ? value.substring(0, MAX_TEXT) : value;
     }
 }

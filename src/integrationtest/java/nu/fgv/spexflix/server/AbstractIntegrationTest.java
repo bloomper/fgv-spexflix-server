@@ -91,7 +91,7 @@ public abstract class AbstractIntegrationTest {
     protected static final String PASSWORD = "s3cr3t-s3cr3t";
     protected static final String CLIENT_ID = "fgv-spexflix";
     protected static final String SPEXIFY_SERVICE_CLIENT_ID = "fgv-spexify-service";
-    protected static final long SPEX_ID = 1L;
+    protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
     protected static final WireMockServer SPEXREGISTER = new WireMockServer(options().dynamicPort());
     protected static final WireMockServer SPEXIFY = new WireMockServer(options().dynamicPort());
     protected static final Path MEDIA = Path.of("build/integrationtest-data/media").toAbsolutePath();
@@ -104,6 +104,7 @@ public abstract class AbstractIntegrationTest {
             .withTmpFs(Map.of("/var/lib/mysql", "rw"))
             .withCommand("mysqld", "--innodb-flush-log-at-trx-commit=0", "--innodb-doublewrite=0", "--skip-log-bin", "--performance-schema=OFF");
     private static final KeycloakContainer KEYCLOAK = new KeycloakContainer("quay.io/keycloak/keycloak:26.8").withRealmImportFile("/realm/fgv.json");
+
     static {
         Startables.deepStart(MYSQL, KEYCLOAK).join();
         SPEXREGISTER.start();
@@ -276,22 +277,6 @@ public abstract class AbstractIntegrationTest {
                 .anySatisfy(error -> assertThat(String.valueOf(error.getErrorType())).isEqualTo(code)));
     }
 
-    @BeforeEach
-    void resetState() throws IOException {
-        jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
-        for (final String table : List.of("audit_entry", "watch_list_entry", "watch_progress", "processing_job",
-                "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock")) {
-            jdbcClient.sql("TRUNCATE TABLE " + table).update();
-        }
-        jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 1").update();
-        // Back to the defaults, which an admin test may have changed
-        jdbcClient.sql("DELETE FROM settings").update();
-        storage.wipe();
-        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
-        spexregisterUp();
-        spexifyUp();
-    }
-
     /**
      * Spexregister answering with spex {@value #SPEX_ID}, Cleopatra 2024.
      */
@@ -300,8 +285,8 @@ public abstract class AbstractIntegrationTest {
         SPEXREGISTER.stubFor(post(urlEqualTo("/api/graphql"))
                 .withRequestBody(containing("SpexById"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spex": {"id": "1", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null,
-                                           "category": {"id": "1", "name": "Chalmersspexet"}}}}""")));
+                        {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null,
+                                           "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}}}""")));
     }
 
     protected static void spexregisterDown() {
@@ -317,8 +302,24 @@ public abstract class AbstractIntegrationTest {
         SPEXIFY.stubFor(post(urlEqualTo("/api/graphql"))
                 .withRequestBody(containing("SpexTracks"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spexTracks": [{"id": "11", "title": "Ouvertyr", "discNumber": 1, "trackNumber": 1,
-                                                  "albumId": "5", "albumTitle": "Cleopatra", "spexId": "1"}]}}""")));
+                        {"data": {"spexTracks": [{"id": "00000000-0000-7000-8000-000000000011", "title": "Ouvertyr", "discNumber": 1, "trackNumber": 1,
+                                                  "albumId": "00000000-0000-7000-8000-000000000005", "albumTitle": "Cleopatra", "spexId": "00000000-0000-7000-8000-000000000001"}]}}""")));
+    }
+
+    @BeforeEach
+    void resetState() throws IOException {
+        jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
+        for (final String table : List.of("audit_entry", "watch_list_entry", "watch_progress", "processing_job",
+                "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock")) {
+            jdbcClient.sql("TRUNCATE TABLE " + table).update();
+        }
+        jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 1").update();
+        // Back to the defaults, which an admin test may have changed
+        jdbcClient.sql("DELETE FROM settings").update();
+        storage.wipe();
+        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
+        spexregisterUp();
+        spexifyUp();
     }
 
     protected HttpGraphQlTester graphQl(final @Nullable String user) {
@@ -360,7 +361,7 @@ public abstract class AbstractIntegrationTest {
      */
     protected String readyVideo(final Path folder, final boolean publish) throws IOException, InterruptedException {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: 1, kind: FULL_SHOW}) { id status } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: FULL_SHOW}) { id status } }")
                 .execute()
                 .path("videoCreate.status").entity(String.class).isEqualTo("UPLOADING")
                 .path("videoCreate.id").entity(String.class).get();

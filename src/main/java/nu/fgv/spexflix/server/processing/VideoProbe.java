@@ -44,20 +44,6 @@ public class VideoProbe {
         this.jsonMapper = jsonMapper;
     }
 
-    /**
-     * The file's video, or empty when it is not video ffprobe can read.
-     */
-    public Optional<Result> probe(final Path file) {
-        try {
-            final List<String> arguments = new ArrayList<>(Ffmpeg.VIDEO_INPUT);
-
-            arguments.addAll(List.of("-v", "error", "-print_format", "json", "-show_format", "-show_streams", file.toString()));
-            return parse(jsonMapper.readTree(ffmpeg.probe(arguments)));
-        } catch (final IOException | RuntimeException e) {
-            return Optional.empty();
-        }
-    }
-
     static Optional<Result> parse(final JsonNode root) {
         JsonNode video = null;
         JsonNode audio = null;
@@ -106,6 +92,20 @@ public class VideoProbe {
             return Double.parseDouble(value);
         } catch (final NumberFormatException e) {
             return 0;
+        }
+    }
+
+    /**
+     * The file's video, or empty when it is not video ffprobe can read.
+     */
+    public Optional<Result> probe(final Path file) {
+        try {
+            final List<String> arguments = new ArrayList<>(Ffmpeg.VIDEO_INPUT);
+
+            arguments.addAll(List.of("-v", "error", "-print_format", "json", "-show_format", "-show_streams", file.toString()));
+            return parse(jsonMapper.readTree(ffmpeg.probe(arguments)));
+        } catch (final IOException | RuntimeException e) {
+            return Optional.empty();
         }
     }
 

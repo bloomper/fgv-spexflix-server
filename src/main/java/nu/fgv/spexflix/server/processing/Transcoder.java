@@ -55,64 +55,6 @@ public class Transcoder {
         this.probe = probe;
     }
 
-    /**
-     * What was made.
-     */
-    public record Output(VideoProbe.Result probe, List<Made> renditions, boolean thumbnails) {
-    }
-
-    public record Made(RenditionPlan.Step step, int bitrateKbps, long size) {
-    }
-
-    /**
-     * Thrown when the file is not video ffprobe can read.
-     */
-    public static class NotVideoException extends IOException {
-
-        public NotVideoException() {
-            super("The file is not video that can be read");
-        }
-    }
-
-    /**
-     * Processes the source into {@code target}, which is created anew.
-     *
-     * @param posterSeconds where to take the poster from, or null for a tenth into the video
-     * @param progress      receives 0–100
-     */
-    public Output transcode(final Path source, final Path target, final @Nullable Double posterSeconds,
-                            final IntConsumer progress) throws IOException {
-        final VideoProbe.Result info = probe.probe(source).orElseThrow(NotVideoException::new);
-        final List<RenditionPlan.Step> steps = RenditionPlan.plan(info);
-        final double durationMicros = Math.max(info.durationMs(), 1) * 1000.0;
-        final int stages = steps.size() + 1;
-        final List<Made> made = new ArrayList<>();
-
-        FileSystemUtils.deleteRecursively(target);
-        Files.createDirectories(target);
-        for (int i = 0; i < steps.size(); i++) {
-            final RenditionPlan.Step step = steps.get(i);
-            final Path folder = target.resolve(Integer.toString(step.height()));
-            final int stage = i;
-
-            Files.createDirectories(folder);
-            ffmpeg.ffmpeg(renditionArguments(source, folder, step, info), micros ->
-                    progress.accept((int) Math.min(99, 100.0 * (stage + Math.min(1, micros / durationMicros)) / stages)));
-
-            final long size = folderSize(folder);
-            final int bitrate = step.copy() ? (int) Math.max(1, size * 8 / Math.max(info.durationMs(), 1)) : step.bitrateKbps();
-
-            made.add(new Made(step, bitrate, size));
-        }
-        writeMaster(target, made, info.audioCodec() != null);
-
-        final boolean thumbnails = thumbnails(source, target.resolve("thumbs"), info);
-
-        poster(source, target.resolve("poster.jpg"), posterSeconds == null ? info.durationMs() / 10000.0 : posterSeconds);
-        progress.accept(100);
-        return new Output(info, made, thumbnails);
-    }
-
     static List<String> renditionArguments(final Path source, final Path folder, final RenditionPlan.Step step,
                                            final VideoProbe.Result info) {
         final List<String> arguments = input(source);
@@ -156,6 +98,89 @@ public class Transcoder {
         Files.writeString(target.resolve("master.m3u8"), master(renditions, audio), StandardCharsets.UTF_8);
     }
 
+    static String thumbnailIndex(final double seconds, final int interval, final int height) {
+        final StringBuilder vtt = new StringBuilder("WEBVTT\n\n");
+        final int count = (int) Math.ceil(seconds / interval);
+
+        for (int i = 0; i < count; i++) {
+            final int sprite = i / (TILES * TILES) + 1;
+            final int tile = i % (TILES * TILES);
+
+            vtt.append(timestamp(i * interval)).append(" --> ").append(timestamp(Math.min(seconds, (i + 1.0) * interval))).append('\n')
+                    .append("sprite_%03d.jpg#xywh=%d,%d,%d,%d".formatted(sprite, tile % TILES * THUMB_WIDTH, tile / TILES * height, THUMB_WIDTH, height))
+                    .append("\n\n");
+        }
+        return vtt.toString();
+    }
+
+    static String timestamp(final double seconds) {
+        final long millis = Math.round(seconds * 1000);
+
+        return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d", millis / 3_600_000, millis / 60_000 % 60, millis / 1000 % 60, millis % 1000);
+    }
+
+    /**
+     * {@code -i source}, after the options that keep ffmpeg to what the source should be: an uploaded video, or the
+     * HLS renditions Spexflix made itself.
+     */
+    static List<String> input(final Path source) {
+        final List<String> arguments = new ArrayList<>(source.getFileName().toString().endsWith(".m3u8") ? Ffmpeg.HLS_INPUT : Ffmpeg.VIDEO_INPUT);
+
+        arguments.addAll(List.of("-i", source.toString()));
+        return arguments;
+    }
+
+    private static long folderSize(final Path folder) throws IOException {
+        try (Stream<Path> files = Files.list(folder)) {
+            return files.mapToLong(file -> {
+                try {
+                    return Files.size(file);
+                } catch (final IOException e) {
+                    return 0;
+                }
+            }).sum();
+        }
+    }
+
+    /**
+     * Processes the source into {@code target}, which is created anew.
+     *
+     * @param posterSeconds where to take the poster from, or null for a tenth into the video
+     * @param progress      receives 0–100
+     */
+    public Output transcode(final Path source, final Path target, final @Nullable Double posterSeconds,
+                            final IntConsumer progress) throws IOException {
+        final VideoProbe.Result info = probe.probe(source).orElseThrow(NotVideoException::new);
+        final List<RenditionPlan.Step> steps = RenditionPlan.plan(info);
+        final double durationMicros = Math.max(info.durationMs(), 1) * 1000.0;
+        final int stages = steps.size() + 1;
+        final List<Made> made = new ArrayList<>();
+
+        FileSystemUtils.deleteRecursively(target);
+        Files.createDirectories(target);
+        for (int i = 0; i < steps.size(); i++) {
+            final RenditionPlan.Step step = steps.get(i);
+            final Path folder = target.resolve(Integer.toString(step.height()));
+            final int stage = i;
+
+            Files.createDirectories(folder);
+            ffmpeg.ffmpeg(renditionArguments(source, folder, step, info), micros ->
+                    progress.accept((int) Math.min(99, 100.0 * (stage + Math.min(1, micros / durationMicros)) / stages)));
+
+            final long size = folderSize(folder);
+            final int bitrate = step.copy() ? (int) Math.max(1, size * 8 / Math.max(info.durationMs(), 1)) : step.bitrateKbps();
+
+            made.add(new Made(step, bitrate, size));
+        }
+        writeMaster(target, made, info.audioCodec() != null);
+
+        final boolean thumbnails = thumbnails(source, target.resolve("thumbs"), info);
+
+        poster(source, target.resolve("poster.jpg"), posterSeconds == null ? info.durationMs() / 10000.0 : posterSeconds);
+        progress.accept(100);
+        return new Output(info, made, thumbnails);
+    }
+
     /**
      * Timeline thumbnails: sprites of 10 × 10 frames and a WebVTT index pointing into them.
      */
@@ -179,27 +204,6 @@ public class Transcoder {
         }
     }
 
-    static String thumbnailIndex(final double seconds, final int interval, final int height) {
-        final StringBuilder vtt = new StringBuilder("WEBVTT\n\n");
-        final int count = (int) Math.ceil(seconds / interval);
-
-        for (int i = 0; i < count; i++) {
-            final int sprite = i / (TILES * TILES) + 1;
-            final int tile = i % (TILES * TILES);
-
-            vtt.append(timestamp(i * interval)).append(" --> ").append(timestamp(Math.min(seconds, (i + 1.0) * interval))).append('\n')
-                    .append("sprite_%03d.jpg#xywh=%d,%d,%d,%d".formatted(sprite, tile % TILES * THUMB_WIDTH, tile / TILES * height, THUMB_WIDTH, height))
-                    .append("\n\n");
-        }
-        return vtt.toString();
-    }
-
-    static String timestamp(final double seconds) {
-        final long millis = Math.round(seconds * 1000);
-
-        return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d", millis / 3_600_000, millis / 60_000 % 60, millis / 1000 % 60, millis % 1000);
-    }
-
     /**
      * Takes a frame as poster, 1280 pixels wide at most.
      */
@@ -212,25 +216,21 @@ public class Transcoder {
     }
 
     /**
-     * {@code -i source}, after the options that keep ffmpeg to what the source should be: an uploaded video, or the
-     * HLS renditions Spexflix made itself.
+     * What was made.
      */
-    static List<String> input(final Path source) {
-        final List<String> arguments = new ArrayList<>(source.getFileName().toString().endsWith(".m3u8") ? Ffmpeg.HLS_INPUT : Ffmpeg.VIDEO_INPUT);
-
-        arguments.addAll(List.of("-i", source.toString()));
-        return arguments;
+    public record Output(VideoProbe.Result probe, List<Made> renditions, boolean thumbnails) {
     }
 
-    private static long folderSize(final Path folder) throws IOException {
-        try (Stream<Path> files = Files.list(folder)) {
-            return files.mapToLong(file -> {
-                try {
-                    return Files.size(file);
-                } catch (final IOException e) {
-                    return 0;
-                }
-            }).sum();
+    public record Made(RenditionPlan.Step step, int bitrateKbps, long size) {
+    }
+
+    /**
+     * Thrown when the file is not video ffprobe can read.
+     */
+    public static class NotVideoException extends IOException {
+
+        public NotVideoException() {
+            super("The file is not video that can be read");
         }
     }
 }

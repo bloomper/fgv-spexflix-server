@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -80,7 +81,7 @@ public class PlaybackService {
     }
 
     @Transactional(readOnly = true)
-    public PlaybackDto playback(final Long videoId) {
+    public PlaybackDto playback(final UUID videoId) {
         final Video video = videoService.visible(videoId);
 
         if (video.getStatus() != VideoStatus.READY && video.getRenditions().isEmpty()) {
@@ -88,7 +89,7 @@ public class PlaybackService {
         }
 
         final Instant expires = clock.instant().plus(Duration.ofMillis(Objects.requireNonNullElse(video.getDurationMs(), 0L))).plus(margin);
-        final String prefix = signer.prefix(video.getUuid(), expires);
+        final String prefix = signer.prefix(video.getUuid().toString(), expires);
 
         return new PlaybackDto(prefix + video.getGeneration() + "/master.m3u8",
                 video.isHasThumbnails() ? prefix + video.getGeneration() + "/thumbs/thumbs.vtt" : null,
@@ -100,14 +101,14 @@ public class PlaybackService {
     }
 
     @Transactional
-    public void saveProgress(final Long videoId, final int positionSeconds) {
+    public void saveProgress(final UUID videoId, final int positionSeconds) {
         final Video video = videoService.visible(videoId);
         final AppUser user = currentUser();
-        final WatchProgress progress = progressRepository.findByUserIdAndVideoId(user.getId(), videoId).orElseGet(() -> {
+        final WatchProgress progress = progressRepository.findByUserIdAndVideoId(user.getId(), video.getId()).orElseGet(() -> {
             final WatchProgress created = new WatchProgress();
 
             created.setUserId(user.getId());
-            created.setVideoId(videoId);
+            created.setVideoId(video.getId());
             return created;
         });
         final long durationSeconds = Objects.requireNonNullElse(video.getDurationMs(), 0L) / 1000;
@@ -138,33 +139,34 @@ public class PlaybackService {
     }
 
     @Transactional
-    public void watchListAdd(final Long videoId) {
-        videoService.visible(videoId);
-
+    public void watchListAdd(final UUID videoId) {
+        final Video video = videoService.visible(videoId);
         final AppUser user = currentUser();
 
-        if (watchListRepository.findByUserIdAndVideoId(user.getId(), videoId).isEmpty()) {
+        if (watchListRepository.findByUserIdAndVideoId(user.getId(), video.getId()).isEmpty()) {
             final WatchListEntry entry = new WatchListEntry();
 
             entry.setUserId(user.getId());
-            entry.setVideoId(videoId);
+            entry.setVideoId(video.getId());
             entry.setAddedAt(clock.instant());
             watchListRepository.save(entry);
         }
     }
 
     @Transactional
-    public void watchListRemove(final Long videoId) {
+    public void watchListRemove(final UUID videoId) {
         final AppUser user = currentUser();
 
-        watchListRepository.findByUserIdAndVideoId(user.getId(), videoId).ifPresent(watchListRepository::delete);
+        videoRepository.findByUuid(videoId)
+                .flatMap(video -> watchListRepository.findByUserIdAndVideoId(user.getId(), video.getId()))
+                .ifPresent(watchListRepository::delete);
     }
 
     /**
      * The caller's progress and watch list for some videos, for the list fields of {@code Video}.
      */
     @Transactional
-    public PersonalState personal(final Collection<Long> videoIds) {
+    public PersonalState personal(final Collection<UUID> videoIds) {
         final Caller caller = callerService.currentIfAny().orElse(null);
 
         if (caller == null || !caller.isUser() || videoIds.isEmpty()) {
@@ -172,11 +174,13 @@ public class PlaybackService {
         }
 
         final AppUser user = callerService.record(caller);
-        final Map<Long, WatchProgress> progress = new HashMap<>();
+        final Map<Long, UUID> uuids = videoRepository.findByUuidIn(videoIds).stream()
+                .collect(Collectors.toMap(Video::getId, Video::getUuid));
+        final Map<UUID, WatchProgress> progress = new HashMap<>();
 
-        progressRepository.findByUserIdAndVideoIdIn(user.getId(), videoIds).forEach(entry -> progress.put(entry.getVideoId(), entry));
-        return new PersonalState(progress, watchListRepository.findByUserIdAndVideoIdIn(user.getId(), videoIds).stream()
-                .map(WatchListEntry::getVideoId).collect(Collectors.toSet()));
+        progressRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).forEach(entry -> progress.put(uuids.get(entry.getVideoId()), entry));
+        return new PersonalState(progress, watchListRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).stream()
+                .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()));
     }
 
     private List<VideoDto> listedInOrder(final List<Long> ids) {
@@ -201,6 +205,6 @@ public class PlaybackService {
     public record PlaybackSubtitleDto(String language, String label, String url) {
     }
 
-    public record PersonalState(Map<Long, WatchProgress> progress, Set<Long> watchList) {
+    public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList) {
     }
 }

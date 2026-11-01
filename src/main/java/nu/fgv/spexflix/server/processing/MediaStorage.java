@@ -62,12 +62,19 @@ public class MediaStorage {
         }
     }
 
+    public static String extensionOf(final String fileName) {
+        final int dot = fileName.lastIndexOf('.');
+        final String extension = dot < 0 ? "bin" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
+
+        return extension.matches("[a-z0-9]{1,10}") ? extension : "bin";
+    }
+
     public Path root() {
         return root;
     }
 
     public Path originals(final Video video) {
-        return root.resolve("originals").resolve(video.getUuid());
+        return root.resolve("originals").resolve(video.getUuid().toString());
     }
 
     public Path original(final Video video) {
@@ -75,7 +82,7 @@ public class MediaStorage {
     }
 
     public Path hls(final Video video) {
-        return root.resolve("hls").resolve(video.getUuid());
+        return root.resolve("hls").resolve(video.getUuid().toString());
     }
 
     public Path generation(final Video video, final int generation) {
@@ -165,12 +172,5 @@ public class MediaStorage {
                 }
             }
         }
-    }
-
-    public static String extensionOf(final String fileName) {
-        final int dot = fileName.lastIndexOf('.');
-        final String extension = dot < 0 ? "bin" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
-
-        return extension.matches("[a-z0-9]{1,10}") ? extension : "bin";
     }
 }

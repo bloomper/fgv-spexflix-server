@@ -35,6 +35,7 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import static org.springframework.security.oauth2.client.web.client.RequestAttributeClientRegistrationIdResolver.clientRegistrationId;
 
@@ -76,7 +77,7 @@ public class SpexifyClient {
     }
 
     @Cacheable(cacheNames = CacheConfig.SPEXIFY_TRACKS)
-    public List<Track> tracks(final Long spexId) {
+    public List<Track> tracks(final UUID spexId) {
         if (graphQlClient == null) {
             return List.of();
         }

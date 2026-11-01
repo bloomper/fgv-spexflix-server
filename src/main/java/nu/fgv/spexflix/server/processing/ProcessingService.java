@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * The processing queue and storage, as editors and admins see them.
@@ -53,6 +54,11 @@ public class ProcessingService {
         this.callerService = callerService;
     }
 
+    private static JobDto toDto(final ProcessingJob job) {
+        return new JobDto(job.getId(), job.getVideo().getUuid(), job.getVideo().getTitle(), job.getStatus().name(), job.getProgress(),
+                job.getAttempts(), job.getError(), job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt());
+    }
+
     /**
      * Running and waiting jobs first, then the latest finished ones.
      */
@@ -69,11 +75,12 @@ public class ProcessingService {
      * The latest job of each video, for editors.
      */
     @Transactional(readOnly = true)
-    public Map<Long, JobDto> latest(final Collection<Long> videoIds) {
-        final Map<Long, JobDto> jobs = new HashMap<>();
+    public Map<UUID, JobDto> latest(final Collection<UUID> videoIds) {
+        final Map<UUID, JobDto> jobs = new HashMap<>();
 
         if (callerService.currentIfAny().map(caller -> caller.isEditor()).orElse(false)) {
-            videoIds.forEach(id -> jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(id).ifPresent(job -> jobs.put(id, toDto(job))));
+            videoRepository.findByUuidIn(videoIds).forEach(video -> jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(video.getId())
+                    .ifPresent(job -> jobs.put(video.getUuid(), toDto(job))));
         }
         return jobs;
     }
@@ -88,12 +95,7 @@ public class ProcessingService {
         }
     }
 
-    private static JobDto toDto(final ProcessingJob job) {
-        return new JobDto(job.getId(), job.getVideo().getId(), job.getVideo().getTitle(), job.getStatus().name(), job.getProgress(),
-                job.getAttempts(), job.getError(), job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt());
-    }
-
-    public record JobDto(Long id, Long videoId, String videoTitle, String status, int progress, int attempts,
+    public record JobDto(Long id, UUID videoId, String videoTitle, String status, int progress, int attempts,
                          @Nullable String error, Instant createdAt, @Nullable Instant startedAt,
                          @Nullable Instant finishedAt) {
     }

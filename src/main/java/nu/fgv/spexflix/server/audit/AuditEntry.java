@@ -60,7 +60,7 @@ public class AuditEntry {
     private String entityType;
 
     @Column(name = "entity_id")
-    private @Nullable Long entityId;
+    private @Nullable String entityId;
 
     @Column(name = "summary", nullable = false)
     private String summary;
