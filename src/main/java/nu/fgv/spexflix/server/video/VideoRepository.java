@@ -23,6 +23,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repository for {@link Video}.
@@ -31,6 +33,10 @@ import java.util.List;
  * @since 1.0
  */
 public interface VideoRepository extends JpaRepository<Video, Long> {
+
+    Optional<Video> findByUuid(UUID uuid);
+
+    List<Video> findByUuidIn(Collection<UUID> uuids);
 
     @Query("SELECT v FROM Video v WHERE v.trashedAt IS NULL ORDER BY v.year DESC, v.title ASC")
     List<Video> findNotTrashed();
@@ -48,9 +54,9 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
     List<Video> findByTrashedAtIsNotNullOrderByTrashedAtDesc();
 
     @Query("SELECT DISTINCT v.spex.id FROM Video v WHERE v.spex.id IS NOT NULL")
-    List<Long> findSpexIds();
+    List<UUID> findSpexIds();
 
-    List<Video> findBySpexIdIn(Collection<Long> spexIds);
+    List<Video> findBySpexIdIn(Collection<UUID> spexIds);
 
     @Query("""
             SELECT DISTINCT v FROM Video v LEFT JOIN v.chapters c

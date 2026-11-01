@@ -29,6 +29,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
+import java.util.UUID;
+
 /**
  * A marked point in a video, usually where a number starts, optionally linked to the number's track in Spexify. The
  * track's title is copied so the chapter reads well while Spexify is unavailable.
@@ -57,7 +59,7 @@ public class Chapter {
     private String title;
 
     @Column(name = "spexify_track_id")
-    private @Nullable Long spexifyTrackId;
+    private @Nullable UUID spexifyTrackId;
 
     @Column(name = "spexify_track_title")
     private @Nullable String spexifyTrackTitle;

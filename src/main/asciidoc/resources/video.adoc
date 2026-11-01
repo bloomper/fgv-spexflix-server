@@ -9,30 +9,32 @@
 
 xref:../api-guide.adoc[Back to API guide]
 
-Posters, and uploads of posters and subtitles. Video itself is never served by Spexflix Server, but by the media
-server from signed addresses, which ``playback`` in the xref:../graphql-api-guide.adoc#playback[GraphQL API] returns.
+Posters, and uploads of posters and subtitles.
+Video itself is never served by Spexflix Server, but by the media server from signed addresses, which ``playback`` in the xref:../graphql-api-guide.adoc#playback[GraphQL API] returns.
 `404 Not Found` when the video does not exist or the caller may not see it.
 
 [[poster]]
 == Poster
 
-The uploaded poster, else the frame taken while processing, else the poster of the video's spex from Spexregister,
-else `404 Not Found`.
+The uploaded poster, else the frame taken while processing, else the poster of the video's spex from Spexregister, else `404 Not Found`.
 
 operation::video-poster-get[snippets='security,path-parameters,request-headers,http-request,response-headers']
 
 [[poster_upload]]
 == Poster upload
 
-Replaces the poster. The image type is read from the file, not from its name; anything but JPEG, PNG and WebP is
-`400 Bad Request`. The answer is the video, as in GraphQL.
+Replaces the poster.
+The image type is read from the file, not from its name; anything but JPEG, PNG and WebP is
+`400 Bad Request`.
+The answer is the video, as in GraphQL.
 
 operation::video-poster-post[snippets='security,path-parameters,request-parts,request-headers,http-request,response-fields,http-response']
 
 [[subtitle_upload]]
 == Subtitle upload
 
-Adds or replaces the subtitles in a language. SubRip is converted to WebVTT; anything else is `400 Bad Request`.
+Adds or replaces the subtitles in a language.
+SubRip is converted to WebVTT; anything else is `400 Bad Request`.
 Subtitles are kept when the video is processed again.
 
 |===

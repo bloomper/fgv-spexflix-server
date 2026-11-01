@@ -41,8 +41,6 @@ import java.util.function.LongConsumer;
 @Component
 public class Ffmpeg {
 
-    private static final Duration PROBE_TIMEOUT = Duration.ofMinutes(2);
-    private static final Duration TRANSCODE_TIMEOUT = Duration.ofHours(12);
     /**
      * Input options for video files people uploaded: local files and video containers only, so that a file posing as a
      * playlist cannot make ffmpeg read other files or URLs into the video. They go before the {@code -i} they apply to.
@@ -53,42 +51,14 @@ public class Ffmpeg {
      * Input options for the HLS renditions Spexflix made itself.
      */
     public static final List<String> HLS_INPUT = List.of("-protocol_whitelist", "file", "-format_whitelist", "hls,mpegts");
-
+    private static final Duration PROBE_TIMEOUT = Duration.ofMinutes(2);
+    private static final Duration TRANSCODE_TIMEOUT = Duration.ofHours(12);
     private final int priority;
     private final boolean nice;
 
     public Ffmpeg(final SpexflixProperties properties) {
         this.priority = properties.worker().priority();
         this.nice = isAvailable("nice");
-    }
-
-    public String probe(final List<String> arguments) throws IOException {
-        final List<String> command = new ArrayList<>();
-
-        command.add("ffprobe");
-        command.addAll(arguments);
-        return run(command, PROBE_TIMEOUT, null);
-    }
-
-    public void ffmpeg(final List<String> arguments) throws IOException {
-        ffmpeg(arguments, null);
-    }
-
-    /**
-     * Runs ffmpeg, reporting how far it has come in microseconds of output through {@code -progress}.
-     */
-    public void ffmpeg(final List<String> arguments, final LongConsumer progressMicros) throws IOException {
-        final List<String> command = new ArrayList<>();
-
-        if (nice) {
-            command.addAll(List.of("nice", "-n", Integer.toString(priority)));
-        }
-        command.addAll(List.of("ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"));
-        if (progressMicros != null) {
-            command.addAll(List.of("-progress", "pipe:1", "-nostats"));
-        }
-        command.addAll(arguments);
-        run(command, TRANSCODE_TIMEOUT, progressMicros);
     }
 
     private static String run(final List<String> command, final Duration timeout, final LongConsumer progress) throws IOException {
@@ -151,5 +121,34 @@ public class Ffmpeg {
         } catch (final IOException | InterruptedException e) {
             return false;
         }
+    }
+
+    public String probe(final List<String> arguments) throws IOException {
+        final List<String> command = new ArrayList<>();
+
+        command.add("ffprobe");
+        command.addAll(arguments);
+        return run(command, PROBE_TIMEOUT, null);
+    }
+
+    public void ffmpeg(final List<String> arguments) throws IOException {
+        ffmpeg(arguments, null);
+    }
+
+    /**
+     * Runs ffmpeg, reporting how far it has come in microseconds of output through {@code -progress}.
+     */
+    public void ffmpeg(final List<String> arguments, final LongConsumer progressMicros) throws IOException {
+        final List<String> command = new ArrayList<>();
+
+        if (nice) {
+            command.addAll(List.of("nice", "-n", Integer.toString(priority)));
+        }
+        command.addAll(List.of("ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"));
+        if (progressMicros != null) {
+            command.addAll(List.of("-progress", "pipe:1", "-nostats"));
+        }
+        command.addAll(arguments);
+        run(command, TRANSCODE_TIMEOUT, progressMicros);
     }
 }

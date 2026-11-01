@@ -17,14 +17,14 @@
 package nu.fgv.spexflix.server.upload;
 
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
-import nu.fgv.spexflix.server.settings.SettingsService;
 import nu.fgv.spexflix.server.processing.MediaStorage;
+import nu.fgv.spexflix.server.settings.SettingsService;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
 import nu.fgv.spexflix.server.util.error.ResourceNotFoundException;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;

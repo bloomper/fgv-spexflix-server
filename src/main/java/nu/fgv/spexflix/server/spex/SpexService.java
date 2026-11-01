@@ -17,13 +17,13 @@
 package nu.fgv.spexflix.server.spex;
 
 import lombok.extern.slf4j.Slf4j;
-import nu.fgv.spexflix.server.video.SpexRef;
-import nu.fgv.spexflix.server.video.Video;
-import nu.fgv.spexflix.server.video.VideoRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import nu.fgv.spexflix.server.config.CacheConfig;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.SpexregisterUnavailableException;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import nu.fgv.spexflix.server.video.SpexRef;
+import nu.fgv.spexflix.server.video.Video;
+import nu.fgv.spexflix.server.video.VideoRepository;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -86,7 +87,7 @@ public class SpexService {
         }
     }
 
-    public SpexDto byId(final Long id) {
+    public SpexDto byId(final UUID id) {
         try {
             return client.spexById(id).orElseThrow(() -> new nu.fgv.spexflix.server.util.error.BadRequestException("error.spex.notFound", id));
         } catch (final SpexregisterClient.SpexregisterCallException e) {
@@ -95,7 +96,7 @@ public class SpexService {
     }
 
     @Cacheable(cacheNames = CacheConfig.SPEX_POSTERS)
-    public Optional<SpexregisterClient.Poster> poster(final Long spexId) {
+    public Optional<SpexregisterClient.Poster> poster(final UUID spexId) {
         try {
             return client.poster(spexId);
         } catch (final SpexregisterClient.SpexregisterCallException e) {
@@ -121,13 +122,13 @@ public class SpexService {
     @SchedulerLock(name = "spex-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void refresh() {
-        final List<Long> ids = videoRepository.findSpexIds();
+        final List<UUID> ids = videoRepository.findSpexIds();
 
         if (ids.isEmpty()) {
             return;
         }
         try {
-            final Map<Long, SpexDto> spex = client.allSpex().stream().collect(Collectors.toMap(SpexDto::id, Function.identity(), (a, _) -> a));
+            final Map<UUID, SpexDto> spex = client.allSpex().stream().collect(Collectors.toMap(SpexDto::id, Function.identity(), (a, _) -> a));
 
             for (final Video video : videoRepository.findBySpexIdIn(ids)) {
                 final SpexDto current = spex.get(video.getSpex().getId());

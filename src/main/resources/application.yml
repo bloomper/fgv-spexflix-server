@@ -7,6 +7,8 @@ spring:
     open-in-view: false
     properties:
       hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
         # Loads the collections of many videos in one query, not one per video
         default_batch_fetch_size: 100
         transaction:

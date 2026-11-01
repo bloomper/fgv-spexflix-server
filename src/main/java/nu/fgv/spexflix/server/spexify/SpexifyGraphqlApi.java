@@ -27,6 +27,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * GraphQL for the links between chapters and Spexify's tracks.
@@ -54,7 +55,7 @@ public class SpexifyGraphqlApi {
      * The tracks an editor can link the video's chapters to: those of the video's spex.
      */
     @QueryMapping
-    public List<SpexifyClient.Track> spexifyTracks(@Argument final Long videoId) {
+    public List<SpexifyClient.Track> spexifyTracks(@Argument final UUID videoId) {
         callerService.current().requireEditor();
 
         final var video = videoService.video(videoId);
@@ -67,7 +68,7 @@ public class SpexifyGraphqlApi {
      */
     @QueryMapping
     @Transactional(readOnly = true)
-    public List<ChapterLinkDto> chapterLinks(@Argument final List<Long> trackIds) {
+    public List<ChapterLinkDto> chapterLinks(@Argument final List<UUID> trackIds) {
         final Caller caller = callerService.current();
 
         if (!caller.isSpexifyService() && !caller.isUser()) {
@@ -77,11 +78,12 @@ public class SpexifyGraphqlApi {
             return List.of();
         }
         return chapterRepository.findListedByTracks(trackIds).stream()
-                .map(chapter -> new ChapterLinkDto(String.valueOf(chapter.getSpexifyTrackId()), String.valueOf(chapter.getVideo().getId()),
+                .map(chapter -> new ChapterLinkDto(String.valueOf(chapter.getSpexifyTrackId()), String.valueOf(chapter.getVideo().getUuid()),
                         chapter.getVideo().getTitle(), chapter.getTitle(), chapter.getStartSeconds()))
                 .toList();
     }
 
-    public record ChapterLinkDto(String trackId, String videoId, String videoTitle, String chapterTitle, int startSeconds) {
+    public record ChapterLinkDto(String trackId, String videoId, String videoTitle, String chapterTitle,
+                                 int startSeconds) {
     }
 }

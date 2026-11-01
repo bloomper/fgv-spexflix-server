@@ -71,7 +71,7 @@ class AccessIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotCreateVideos() {
         expectError(graphQl(VIEWER)
-                .document("mutation { videoCreate(input: {spexId: 1, kind: FULL_SHOW}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: FULL_SHOW}) { id } }")
                 .execute(), "FORBIDDEN");
     }
 

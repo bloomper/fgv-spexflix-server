@@ -39,6 +39,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -63,61 +64,6 @@ public class MediaController {
         this.videoService = videoService;
         this.storage = storage;
         this.spexService = spexService;
-    }
-
-    /**
-     * The uploaded poster, else the frame taken in processing, else the spex poster, else 404.
-     */
-    @GetMapping("/api/videos/{id}/poster")
-    public ResponseEntity<?> poster(@PathVariable final Long id) throws IOException {
-        final Video video = videoService.visible(id);
-        final Path uploaded = storage.uploadedPoster(video);
-        final Path frame = storage.poster(video);
-        final Path file = video.isPosterUploaded() && Files.isRegularFile(uploaded) ? uploaded : Files.isRegularFile(frame) ? frame : null;
-
-        if (file != null) {
-            return ResponseEntity.ok()
-                    .contentType(Objects.requireNonNullElse(imageType(head(file)), MediaType.IMAGE_JPEG))
-                    .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-                    .body(new FileSystemResource(file));
-        }
-        if (video.getSpex().getId() != null) {
-            return spexService.poster(video.getSpex().getId())
-                    .<ResponseEntity<?>>map(poster -> ResponseEntity.ok()
-                            .contentType(MediaType.parseMediaType(poster.contentType()))
-                            .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-                            .body(poster.content()))
-                    .orElseGet(() -> ResponseEntity.notFound().build());
-        }
-        return ResponseEntity.notFound().build();
-    }
-
-    @PostMapping("/api/videos/{id}/poster")
-    public VideoDto uploadPoster(@PathVariable final Long id, @RequestParam("file") final MultipartFile file) throws IOException {
-        if (file.isEmpty() || file.getSize() > MAX_IMAGE) {
-            throw new BadRequestException("error.poster.invalid");
-        }
-
-        final byte[] content = file.getBytes();
-
-        if (imageType(content) == null) {
-            throw new BadRequestException("error.poster.invalid");
-        }
-        return videoService.posterUpload(id, content);
-    }
-
-    /**
-     * A subtitle file in WebVTT, or SubRip, which is converted to WebVTT.
-     */
-    @PostMapping("/api/videos/{id}/subtitles")
-    public VideoDto uploadSubtitle(@PathVariable final Long id, @RequestParam("file") final MultipartFile file,
-                                   @RequestParam("language") final String language,
-                                   @RequestParam("label") final String label) throws IOException {
-        if (file.isEmpty() || file.getSize() > MAX_SUBTITLE) {
-            throw new BadRequestException("error.subtitle.invalid");
-        }
-        return videoService.subtitleSet(id, language, label, toWebVtt(new String(file.getBytes(), StandardCharsets.UTF_8))
-                .getBytes(StandardCharsets.UTF_8));
     }
 
     static String toWebVtt(final String text) {
@@ -152,5 +98,60 @@ public class MediaController {
             return MediaType.parseMediaType("image/webp");
         }
         return null;
+    }
+
+    /**
+     * The uploaded poster, else the frame taken in processing, else the spex poster, else 404.
+     */
+    @GetMapping("/api/videos/{id}/poster")
+    public ResponseEntity<?> poster(@PathVariable final UUID id) throws IOException {
+        final Video video = videoService.visible(id);
+        final Path uploaded = storage.uploadedPoster(video);
+        final Path frame = storage.poster(video);
+        final Path file = video.isPosterUploaded() && Files.isRegularFile(uploaded) ? uploaded : Files.isRegularFile(frame) ? frame : null;
+
+        if (file != null) {
+            return ResponseEntity.ok()
+                    .contentType(Objects.requireNonNullElse(imageType(head(file)), MediaType.IMAGE_JPEG))
+                    .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                    .body(new FileSystemResource(file));
+        }
+        if (video.getSpex().getId() != null) {
+            return spexService.poster(video.getSpex().getId())
+                    .<ResponseEntity<?>>map(poster -> ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(poster.contentType()))
+                            .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                            .body(poster.content()))
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/api/videos/{id}/poster")
+    public VideoDto uploadPoster(@PathVariable final UUID id, @RequestParam("file") final MultipartFile file) throws IOException {
+        if (file.isEmpty() || file.getSize() > MAX_IMAGE) {
+            throw new BadRequestException("error.poster.invalid");
+        }
+
+        final byte[] content = file.getBytes();
+
+        if (imageType(content) == null) {
+            throw new BadRequestException("error.poster.invalid");
+        }
+        return videoService.posterUpload(id, content);
+    }
+
+    /**
+     * A subtitle file in WebVTT, or SubRip, which is converted to WebVTT.
+     */
+    @PostMapping("/api/videos/{id}/subtitles")
+    public VideoDto uploadSubtitle(@PathVariable final UUID id, @RequestParam("file") final MultipartFile file,
+                                   @RequestParam("language") final String language,
+                                   @RequestParam("label") final String label) throws IOException {
+        if (file.isEmpty() || file.getSize() > MAX_SUBTITLE) {
+            throw new BadRequestException("error.subtitle.invalid");
+        }
+        return videoService.subtitleSet(id, language, label, toWebVtt(new String(file.getBytes(), StandardCharsets.UTF_8))
+                .getBytes(StandardCharsets.UTF_8));
     }
 }

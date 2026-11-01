@@ -27,17 +27,6 @@ import java.util.List;
  */
 public final class RenditionPlan {
 
-    /**
-     * A rendition to make.
-     *
-     * @param height      in pixels
-     * @param width       in pixels, even, keeping the aspect ratio
-     * @param bitrateKbps the video bitrate aimed at
-     * @param copy        whether to copy the original's streams instead of encoding
-     */
-    public record Step(int height, int width, int bitrateKbps, boolean copy) {
-    }
-
     static final int[][] LADDER = {{1080, 5000}, {720, 3000}, {480, 1200}};
 
     private RenditionPlan() {
@@ -67,5 +56,16 @@ public final class RenditionPlan {
         final long width = Math.round((double) probe.width() * height / probe.height());
 
         return (int) (width - width % 2);
+    }
+
+    /**
+     * A rendition to make.
+     *
+     * @param height      in pixels
+     * @param width       in pixels, even, keeping the aspect ratio
+     * @param bitrateKbps the video bitrate aimed at
+     * @param copy        whether to copy the original's streams instead of encoding
+     */
+    public record Step(int height, int width, int bitrateKbps, boolean copy) {
     }
 }

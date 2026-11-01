@@ -36,6 +36,7 @@ import org.springframework.stereotype.Controller;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * GraphQL for videos and watching. A thin adapter: the services decide access.
@@ -65,7 +66,7 @@ public class VideoGraphqlApi {
     }
 
     @QueryMapping
-    public @Nullable VideoDto video(@Argument final Long id) {
+    public @Nullable VideoDto video(@Argument final UUID id) {
         return service.video(id);
     }
 
@@ -100,7 +101,7 @@ public class VideoGraphqlApi {
     }
 
     @QueryMapping
-    public PlaybackService.PlaybackDto playback(@Argument final Long videoId) {
+    public PlaybackService.PlaybackDto playback(@Argument final UUID videoId) {
         return playbackService.playback(videoId);
     }
 
@@ -147,7 +148,7 @@ public class VideoGraphqlApi {
 
     @BatchMapping(typeName = "Video", field = "job")
     public Map<VideoDto, ProcessingService.@Nullable JobDto> job(final List<VideoDto> videos) {
-        final Map<Long, ProcessingService.JobDto> jobs = processingService.latest(videos.stream().map(VideoDto::id).toList());
+        final Map<UUID, ProcessingService.JobDto> jobs = processingService.latest(videos.stream().map(VideoDto::id).toList());
         final Map<VideoDto, ProcessingService.@Nullable JobDto> result = new LinkedHashMap<>();
 
         videos.forEach(video -> result.put(video, jobs.get(video.id())));
@@ -160,32 +161,32 @@ public class VideoGraphqlApi {
     }
 
     @MutationMapping
-    public VideoDto videoUpdate(@Argument final Long id, @Argument final VideoInput input) {
+    public VideoDto videoUpdate(@Argument final UUID id, @Argument final VideoInput input) {
         return service.update(id, input);
     }
 
     @MutationMapping
-    public VideoDto videoSetFile(@Argument final Long id, @Argument final String uploadId) {
+    public VideoDto videoSetFile(@Argument final UUID id, @Argument final String uploadId) {
         return service.setFile(id, uploadId);
     }
 
     @MutationMapping
-    public VideoDto videoPublish(@Argument final Long id, @Argument final boolean published) {
+    public VideoDto videoPublish(@Argument final UUID id, @Argument final boolean published) {
         return service.publish(id, published);
     }
 
     @MutationMapping
-    public VideoDto videoTrash(@Argument final Long id) {
+    public VideoDto videoTrash(@Argument final UUID id) {
         return service.trash(id, true);
     }
 
     @MutationMapping
-    public VideoDto videoRestore(@Argument final Long id) {
+    public VideoDto videoRestore(@Argument final UUID id) {
         return service.trash(id, false);
     }
 
     @MutationMapping
-    public @Nullable Void videoDelete(@Argument final Long id) {
+    public @Nullable Void videoDelete(@Argument final UUID id) {
         service.delete(id);
         return null;
     }
@@ -197,39 +198,39 @@ public class VideoGraphqlApi {
     }
 
     @MutationMapping
-    public VideoDto videoPosterFrame(@Argument final Long id, @Argument final double seconds) {
+    public VideoDto videoPosterFrame(@Argument final UUID id, @Argument final double seconds) {
         return service.posterFrame(id, seconds);
     }
 
     @MutationMapping
-    public VideoDto videoReprocess(@Argument final Long id) {
+    public VideoDto videoReprocess(@Argument final UUID id) {
         return service.reprocess(id);
     }
 
     @MutationMapping
-    public VideoDto chaptersSet(@Argument final Long videoId, @Argument final List<ChapterInput> chapters) {
+    public VideoDto chaptersSet(@Argument final UUID videoId, @Argument final List<ChapterInput> chapters) {
         return service.setChapters(videoId, chapters);
     }
 
     @MutationMapping
-    public VideoDto subtitleRemove(@Argument final Long videoId, @Argument final String language) {
+    public VideoDto subtitleRemove(@Argument final UUID videoId, @Argument final String language) {
         return service.subtitleRemove(videoId, language);
     }
 
     @MutationMapping
-    public @Nullable Void progressSave(@Argument final Long videoId, @Argument final int positionSeconds) {
+    public @Nullable Void progressSave(@Argument final UUID videoId, @Argument final int positionSeconds) {
         playbackService.saveProgress(videoId, positionSeconds);
         return null;
     }
 
     @MutationMapping
-    public @Nullable Void watchListAdd(@Argument final Long videoId) {
+    public @Nullable Void watchListAdd(@Argument final UUID videoId) {
         playbackService.watchListAdd(videoId);
         return null;
     }
 
     @MutationMapping
-    public @Nullable Void watchListRemove(@Argument final Long videoId) {
+    public @Nullable Void watchListRemove(@Argument final UUID videoId) {
         playbackService.watchListRemove(videoId);
         return null;
     }

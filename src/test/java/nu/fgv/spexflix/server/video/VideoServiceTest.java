@@ -52,13 +52,13 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
+import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -74,7 +74,7 @@ import static org.mockito.Mockito.when;
 class VideoServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T10:00:00Z");
-    private static final SpexDto CLEOPATRA = new SpexDto(7L, "Cleopatra", 2024, false, null, 1L, "Chalmersspexet");
+    private static final SpexDto CLEOPATRA = new SpexDto(uuid(7), "Cleopatra", 2024, false, null, uuid(1), "Chalmersspexet");
 
     private final List<Video> videos = new ArrayList<>();
     @Mock
@@ -102,6 +102,7 @@ class VideoServiceTest {
         final Video video = new Video();
 
         video.setId(id);
+        video.setUuid(uuid(id));
         video.setTitle(title);
         video.setYear(2024);
         video.setKind(VideoKind.FULL_SHOW);
@@ -123,8 +124,8 @@ class VideoServiceTest {
         ready = video(1L, "Cleopatra", VideoStatus.READY, true);
         waiting = video(2L, "Väntar", VideoStatus.UPLOADING, false);
         videos.addAll(List.of(ready, waiting));
-        lenient().when(videoRepository.findById(anyLong())).thenAnswer(invocation ->
-                videos.stream().filter(video -> video.getId().equals(invocation.getArgument(0))).findFirst());
+        lenient().when(videoRepository.findByUuid(any(UUID.class))).thenAnswer(invocation ->
+                videos.stream().filter(video -> video.getUuid().equals(invocation.getArgument(0))).findFirst());
         lenient().doAnswer(invocation -> {
             final SpexDto spex = invocation.getArgument(0);
             final SpexRef ref = invocation.getArgument(1);
@@ -144,25 +145,25 @@ class VideoServiceTest {
         when(videoRepository.findListed()).thenReturn(List.of(ready));
 
         assertThat(service.videos(new VideoFilter(null, null, null, null, true))).extracting(VideoDto::title).containsExactly("Cleopatra");
-        assertThat(service.video(2L)).isNull();
-        assertThatThrownBy(() -> service.visible(2L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(service.video(uuid(2))).isNull();
+        assertThatThrownBy(() -> service.visible(uuid(2))).isInstanceOf(ResourceNotFoundException.class);
 
         as(TestCallers.editor());
         when(videoRepository.findNotTrashed()).thenReturn(videos);
         assertThat(service.videos(new VideoFilter(null, null, null, null, true))).hasSize(2);
-        assertThat(service.visible(2L).getTitle()).isEqualTo("Väntar");
+        assertThat(service.visible(uuid(2)).getTitle()).isEqualTo("Väntar");
     }
 
     @Test
     void videosAreFilteredByCategoryYearSpexAndKind() {
         as(TestCallers.viewer());
-        ready.getSpex().setId(7L);
-        ready.getSpex().setCategoryId(1L);
+        ready.getSpex().setId(uuid(7));
+        ready.getSpex().setCategoryId(uuid(1));
         when(videoRepository.findListed()).thenReturn(List.of(ready));
 
-        assertThat(service.videos(new VideoFilter(1L, 2024, 7L, VideoKind.FULL_SHOW, null))).hasSize(1);
+        assertThat(service.videos(new VideoFilter(uuid(1), 2024, uuid(7), VideoKind.FULL_SHOW, null))).hasSize(1);
         assertThat(service.videos(new VideoFilter(null, null, null, VideoKind.TRAILER, null))).isEmpty();
-        assertThat(service.videos(new VideoFilter(2L, null, null, null, null))).isEmpty();
+        assertThat(service.videos(new VideoFilter(uuid(2), null, null, null, null))).isEmpty();
     }
 
     @Test
@@ -172,9 +173,9 @@ class VideoServiceTest {
         final Video older = video(3L, "Nobel", VideoStatus.READY, true);
 
         older.setYear(1975);
-        ready.getSpex().setCategoryId(1L);
+        ready.getSpex().setCategoryId(uuid(1));
         ready.getSpex().setCategoryName("Chalmersspexet");
-        older.getSpex().setCategoryId(1L);
+        older.getSpex().setCategoryId(uuid(1));
         older.getSpex().setCategoryName("Chalmersspexet");
         when(videoRepository.findListed()).thenReturn(List.of(ready, older));
 
@@ -204,15 +205,15 @@ class VideoServiceTest {
     @Test
     void aNewVideoTakesTitleAndYearFromItsSpexAndChecksTheDate() {
         as(TestCallers.editor());
-        when(spexService.byId(7L)).thenReturn(CLEOPATRA);
+        when(spexService.byId(uuid(7))).thenReturn(CLEOPATRA);
 
-        final VideoDto created = service.create(new VideoInput(7L, null, null, VideoKind.FULL_SHOW, " Premiären ", "2024-02-14", null));
+        final VideoDto created = service.create(new VideoInput(uuid(7), null, null, VideoKind.FULL_SHOW, " Premiären ", "2024-02-14", null));
 
         assertThat(created.title()).isEqualTo("Cleopatra");
         assertThat(created.year()).isEqualTo(2024);
         assertThat(created.performance()).isEqualTo("Premiären");
         assertThat(created.performanceDate()).isEqualTo(LocalDate.of(2024, 2, 14).toString());
-        assertThatThrownBy(() -> service.create(new VideoInput(7L, null, null, VideoKind.FULL_SHOW, null, "14/2", null)))
+        assertThatThrownBy(() -> service.create(new VideoInput(uuid(7), null, null, VideoKind.FULL_SHOW, null, "14/2", null)))
                 .isInstanceOf(BadRequestException.class);
         assertThatThrownBy(() -> service.create(new VideoInput(null, " ", null, VideoKind.OTHER, null, null, null)))
                 .isInstanceOf(BadRequestException.class);
@@ -221,23 +222,23 @@ class VideoServiceTest {
     @Test
     void viewersCannotEditAndTrashedVideosCannotBeEdited() {
         as(TestCallers.viewer());
-        assertThatThrownBy(() -> service.publish(1L, false)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.publish(uuid(1), false)).isInstanceOf(AccessDeniedException.class);
 
         as(TestCallers.editor());
         ready.setTrashedAt(NOW);
-        assertThatThrownBy(() -> service.publish(1L, false)).isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.publish(99L, false)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.publish(uuid(1), false)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.publish(uuid(99), false)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void onlyReadyVideosArePublishedAndTheDateIsSetOnce() {
         as(TestCallers.editor());
-        assertThatThrownBy(() -> service.publish(2L, true)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.publish(uuid(2), true)).isInstanceOf(BadRequestException.class);
 
         ready.setPublished(false);
-        service.publish(1L, true);
+        service.publish(uuid(1), true);
         assertThat(ready.getPublishedAt()).isEqualTo(NOW);
-        verify(auditService).record("PUBLISH", "VIDEO", 1L, "Publicerade Cleopatra");
+        verify(auditService).record("PUBLISH", "VIDEO", uuid(1), "Publicerade Cleopatra");
     }
 
     @Test
@@ -249,7 +250,7 @@ class VideoServiceTest {
         when(uploadService.claim("u-1", TestCallers.editor())).thenReturn(upload);
         when(uploadService.fileName("u-1")).thenReturn("Cleopatra 2024.MKV");
 
-        final VideoDto result = service.setFile(2L, "u-1");
+        final VideoDto result = service.setFile(uuid(2), "u-1");
 
         assertThat(result.status()).isEqualTo(VideoStatus.PROCESSING);
         assertThat(storage.original(waiting)).hasBinaryContent(new byte[]{1, 2, 3});
@@ -273,9 +274,9 @@ class VideoServiceTest {
         when(uploadService.claim("u-2", TestCallers.editor())).thenReturn(upload);
         when(uploadService.fileName("u-2")).thenReturn("ny.mov");
 
-        assertThat(service.setFile(1L, "u-2").status()).isEqualTo(VideoStatus.READY);
+        assertThat(service.setFile(uuid(1), "u-2").status()).isEqualTo(VideoStatus.READY);
         assertThat(storage.originals(ready).resolve("pending-" + NOW.toEpochMilli() + ".mov")).exists();
-        verify(auditService).record("REPLACE", "VIDEO", 1L, "Bytte filen för Cleopatra");
+        verify(auditService).record("REPLACE", "VIDEO", uuid(1), "Bytte filen för Cleopatra");
     }
 
     @Test
@@ -283,22 +284,22 @@ class VideoServiceTest {
         as(TestCallers.editor());
         when(jobRepository.existsByVideoIdAndStatusIn(eq(2L), any())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.setFile(2L, "u-1")).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.setFile(uuid(2), "u-1")).isInstanceOf(BadRequestException.class);
         verify(uploadService, never()).claim(any(), any());
     }
 
     @Test
     void onlyAdminsReprocessAndOnlyWithAnOriginal() throws Exception {
         as(TestCallers.editor());
-        assertThatThrownBy(() -> service.reprocess(1L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.reprocess(uuid(1))).isInstanceOf(AccessDeniedException.class);
 
         as(TestCallers.admin());
-        assertThatThrownBy(() -> service.reprocess(1L)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.reprocess(uuid(1))).isInstanceOf(BadRequestException.class);
 
         ready.setOriginalExtension("mp4");
         Files.createDirectories(storage.originals(ready));
         Files.write(storage.original(ready), new byte[]{1});
-        service.reprocess(1L);
+        service.reprocess(uuid(1));
         verify(jobRepository).save(any(ProcessingJob.class));
         assertThat(ready.getStatus()).isEqualTo(VideoStatus.READY);
     }
@@ -306,7 +307,7 @@ class VideoServiceTest {
     @Test
     void thePosterIsTakenFromTheOriginalOrElseTheTopRendition() throws Exception {
         as(TestCallers.editor());
-        assertThatThrownBy(() -> service.posterFrame(2L, 10)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.posterFrame(uuid(2), 10)).isInstanceOf(BadRequestException.class);
 
         final Rendition rendition = new Rendition();
 
@@ -316,7 +317,7 @@ class VideoServiceTest {
         Files.createDirectories(storage.hls(ready));
         Files.write(storage.uploadedPoster(ready), new byte[]{1});
 
-        service.posterFrame(1L, 12.5);
+        service.posterFrame(uuid(1), 12.5);
 
         verify(transcoder).poster(storage.generation(ready, 0).resolve("720/index.m3u8"), storage.poster(ready), 12.5);
         assertThat(storage.uploadedPoster(ready)).doesNotExist();
@@ -328,7 +329,7 @@ class VideoServiceTest {
     void anUploadedPosterIsWritten() {
         as(TestCallers.editor());
 
-        service.posterUpload(1L, new byte[]{(byte) 0xFF, (byte) 0xD8});
+        service.posterUpload(uuid(1), new byte[]{(byte) 0xFF, (byte) 0xD8});
 
         assertThat(storage.uploadedPoster(ready)).exists();
         assertThat(ready.isPosterUploaded()).isTrue();
@@ -338,26 +339,26 @@ class VideoServiceTest {
     void chaptersAreReplacedSortedAndValidated() {
         as(TestCallers.editor());
 
-        service.setChapters(1L, List.of(new ChapterInput(90, " Finalen ", null, null), new ChapterInput(0, "Ouvertyr", 12L, "Ouvertyr")));
+        service.setChapters(uuid(1), List.of(new ChapterInput(90, " Finalen ", null, null), new ChapterInput(0, "Ouvertyr", uuid(12), "Ouvertyr")));
 
         assertThat(ready.getChapters()).extracting(Chapter::getTitle).containsExactly("Ouvertyr", "Finalen");
-        assertThat(ready.getChapters().getFirst().getSpexifyTrackId()).isEqualTo(12L);
-        assertThatThrownBy(() -> service.setChapters(1L, List.of(new ChapterInput(-1, "Fel", null, null)))).isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.setChapters(1L, List.of(new ChapterInput(1, " ", null, null)))).isInstanceOf(BadRequestException.class);
+        assertThat(ready.getChapters().getFirst().getSpexifyTrackId()).isEqualTo(uuid(12));
+        assertThatThrownBy(() -> service.setChapters(uuid(1), List.of(new ChapterInput(-1, "Fel", null, null)))).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.setChapters(uuid(1), List.of(new ChapterInput(1, " ", null, null)))).isInstanceOf(BadRequestException.class);
     }
 
     @Test
     void subtitlesAreStoredPerLanguageAndReplaced() {
         as(TestCallers.editor());
 
-        service.subtitleSet(1L, "sv", "Svenska", "WEBVTT".getBytes());
-        service.subtitleSet(1L, "sv", " Svenska (ny) ", "WEBVTT\n\n".getBytes());
+        service.subtitleSet(uuid(1), "sv", "Svenska", "WEBVTT".getBytes());
+        service.subtitleSet(uuid(1), "sv", " Svenska (ny) ", "WEBVTT\n\n".getBytes());
 
         assertThat(ready.getSubtitles()).extracting(Subtitle::getLabel).containsExactly("Svenska (ny)");
         assertThat(storage.subtitle(ready, "sv")).hasBinaryContent("WEBVTT\n\n".getBytes());
-        assertThatThrownBy(() -> service.subtitleSet(1L, "svenska", "Svenska", new byte[0])).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.subtitleSet(uuid(1), "svenska", "Svenska", new byte[0])).isInstanceOf(BadRequestException.class);
 
-        service.subtitleRemove(1L, "sv");
+        service.subtitleRemove(uuid(1), "sv");
         assertThat(ready.getSubtitles()).isEmpty();
         assertThat(storage.subtitle(ready, "sv")).doesNotExist();
     }
@@ -365,11 +366,11 @@ class VideoServiceTest {
     @Test
     void onlyAdminsDeleteAndOnlyFromTheTrash() throws Exception {
         as(TestCallers.admin());
-        assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.delete(uuid(1))).isInstanceOf(BadRequestException.class);
 
         Files.createDirectories(storage.hls(ready));
-        service.trash(1L, true);
-        service.delete(1L);
+        service.trash(uuid(1), true);
+        service.delete(uuid(1));
 
         assertThat(storage.hls(ready)).doesNotExist();
         verify(videoRepository).delete(ready);

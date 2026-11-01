@@ -57,15 +57,6 @@ public class PlaybackSigner {
         this.key = configured.strip();
     }
 
-    /**
-     * The address prefix for a video's files, ending with a slash.
-     */
-    public String prefix(final String uuid, final Instant expires) {
-        final long epoch = expires.getEpochSecond();
-
-        return "%s/v/%d/%s/%s/".formatted(baseUrl, epoch, signature(uuid, epoch, key), uuid);
-    }
-
     static String signature(final String uuid, final long expires, final String key) {
         try {
             final byte[] digest = MessageDigest.getInstance("MD5").digest((expires + uuid + " " + key).getBytes(StandardCharsets.UTF_8));
@@ -74,5 +65,14 @@ public class PlaybackSigner {
         } catch (final NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * The address prefix for a video's files, ending with a slash.
+     */
+    public String prefix(final String uuid, final Instant expires) {
+        final long epoch = expires.getEpochSecond();
+
+        return "%s/v/%d/%s/%s/".formatted(baseUrl, epoch, signature(uuid, epoch, key), uuid);
     }
 }

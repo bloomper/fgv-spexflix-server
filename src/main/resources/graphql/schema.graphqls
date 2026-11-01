@@ -169,7 +169,6 @@ type VideoSpex {
 
 type Video {
     id: ID!
-    uuid: String!
     title: String!
     year: Int
     kind: VideoKind!

@@ -36,15 +36,6 @@ import java.util.List;
 @Slf4j
 final class SampleVideos {
 
-    /**
-     * A generated original.
-     *
-     * @param key  what it tests
-     * @param file the file
-     */
-    record Source(String key, Path file) {
-    }
-
     private static final List<String> FONTS = List.of(
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf");
@@ -122,5 +113,14 @@ final class SampleVideos {
         arguments.addAll(codec);
         arguments.add(file.toString());
         return arguments;
+    }
+
+    /**
+     * A generated original.
+     *
+     * @param key  what it tests
+     * @param file the file
+     */
+    record Source(String key, Path file) {
     }
 }

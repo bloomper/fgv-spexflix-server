@@ -56,14 +56,14 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
         graphQl(VIEWER).document("{ videos { id } }").execute().path("videos").entityList(Object.class).hasSize(0);
 
         final var processed = graphQl(EDITOR)
-                .document("query($id: ID!) { video(id: $id) { uuid title year hasThumbnails renditions { height } } }")
+                .document("query($id: ID!) { video(id: $id) { id title year hasThumbnails renditions { height } } }")
                 .variable("id", videoId)
                 .execute()
                 .path("video.title").entity(String.class).isEqualTo("Cleopatra")
                 .path("video.year").entity(Integer.class).isEqualTo(2024)
                 .path("video.hasThumbnails").entity(Boolean.class).isEqualTo(true)
                 .path("video.renditions[*].height").entityList(Integer.class).containsExactly(240);
-        final String uuid = processed.path("video.uuid").entity(String.class).get();
+        final String uuid = processed.path("video.id").entity(String.class).get();
 
         graphQl(EDITOR).document("mutation($id: ID!) { videoPublish(id: $id, published: true) { published } }").variable("id", videoId).execute();
 
@@ -145,7 +145,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void onlyReadyVideosArePlayedOrPublished() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: 1, kind: TRAILER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: TRAILER}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 
@@ -174,7 +174,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotSeeUnpublishedVideos() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: 1, kind: NUMBER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: NUMBER}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 

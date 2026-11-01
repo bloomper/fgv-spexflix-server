@@ -47,18 +47,18 @@ class SpexifyLinksIntegrationTest extends AbstractIntegrationTest {
                 .document("query($id: ID!) { spexifyTracks(videoId: $id) { id title albumTitle } }")
                 .variable("id", videoId)
                 .execute()
-                .path("spexifyTracks[0].id").entity(String.class).isEqualTo("11")
+                .path("spexifyTracks[0].id").entity(String.class).isEqualTo("00000000-0000-7000-8000-000000000011")
                 .path("spexifyTracks[0].albumTitle").entity(String.class).isEqualTo("Cleopatra");
         graphQl(EDITOR)
                 .document(CHAPTERS)
                 .variables(Map.of("id", videoId, "chapters", List.of(
-                        Map.of("startSeconds", 0, "title", "Ouvertyr", "spexifyTrackId", "11", "spexifyTrackTitle", "Ouvertyr"),
+                        Map.of("startSeconds", 0, "title", "Ouvertyr", "spexifyTrackId", "00000000-0000-7000-8000-000000000011", "spexifyTrackTitle", "Ouvertyr"),
                         Map.of("startSeconds", 5, "title", "Finalen"))))
                 .execute()
-                .path("chaptersSet.chapters[0].spexifyTrackId").entity(String.class).isEqualTo("11");
+                .path("chaptersSet.chapters[0].spexifyTrackId").entity(String.class).isEqualTo("00000000-0000-7000-8000-000000000011");
 
         graphQlWithToken(spexifyServiceToken())
-                .document("{ chapterLinks(trackIds: [\"11\"]) { trackId videoId chapterTitle startSeconds } }")
+                .document("{ chapterLinks(trackIds: [\"00000000-0000-7000-8000-000000000011\"]) { trackId videoId chapterTitle startSeconds } }")
                 .execute()
                 .path("chapterLinks[0].videoId").entity(String.class).isEqualTo(videoId)
                 .path("chapterLinks[0].chapterTitle").entity(String.class).isEqualTo("Ouvertyr")
@@ -66,7 +66,7 @@ class SpexifyLinksIntegrationTest extends AbstractIntegrationTest {
 
         graphQl(EDITOR).document("mutation($id: ID!) { videoPublish(id: $id, published: false) { id } }").variable("id", videoId).execute();
         graphQlWithToken(spexifyServiceToken())
-                .document("{ chapterLinks(trackIds: [\"11\"]) { videoId } }")
+                .document("{ chapterLinks(trackIds: [\"00000000-0000-7000-8000-000000000011\"]) { videoId } }")
                 .execute()
                 .path("chapterLinks").entityList(Object.class).hasSize(0);
     }
@@ -74,7 +74,7 @@ class SpexifyLinksIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotListSpexifysTracks() throws Exception {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: 1, kind: NUMBER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: NUMBER}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 

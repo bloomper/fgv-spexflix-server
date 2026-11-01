@@ -36,6 +36,14 @@ class TranscoderTest {
     private static final SpexflixProperties PROPERTIES = new SpexflixProperties(null, null, null, null,
             new SpexflixProperties.Worker(true, 10), null, null, null);
 
+    private static boolean hasFfmpeg() {
+        try {
+            return new ProcessBuilder("ffmpeg", "-version").start().waitFor() == 0;
+        } catch (final IOException | InterruptedException e) {
+            return false;
+        }
+    }
+
     @Test
     void writesAMasterPlaylistWithEveryRendition() {
         final String master = Transcoder.master(List.of(
@@ -115,13 +123,5 @@ class TranscoderTest {
                 .containsSequence(Ffmpeg.VIDEO_INPUT).endsWith("-i", "/media/originals/abc.mp4");
         assertThat(Transcoder.input(Path.of("/media/hls/abc/3/720/index.m3u8")))
                 .containsSequence(Ffmpeg.HLS_INPUT).endsWith("-i", "/media/hls/abc/3/720/index.m3u8");
-    }
-
-    private static boolean hasFfmpeg() {
-        try {
-            return new ProcessBuilder("ffmpeg", "-version").start().waitFor() == 0;
-        } catch (final IOException | InterruptedException e) {
-            return false;
-        }
     }
 }
