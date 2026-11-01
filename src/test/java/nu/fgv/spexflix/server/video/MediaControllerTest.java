@@ -31,4 +31,20 @@ class MediaControllerTest {
         assertThat(MediaController.toWebVtt("﻿WEBVTT\n\n00:01.000 --> 00:02.000\nHej")).startsWith("WEBVTT");
         assertThatThrownBy(() -> MediaController.toWebVtt("just text")).isInstanceOf(BadRequestException.class);
     }
+
+    @Test
+    void readsTheImageTypeFromTheContent() {
+        assertThat(MediaController.imageType(new byte[]{(byte) 0xFF, (byte) 0xD8, 0, 0})).hasToString("image/jpeg");
+        assertThat(MediaController.imageType(new byte[]{(byte) 0x89, 'P', 'N', 'G', 0, 0, 0, 0, 0})).hasToString("image/png");
+        assertThat(MediaController.imageType("RIFF0000WEBPVP8 ".getBytes())).hasToString("image/webp");
+        assertThat(MediaController.imageType("<svg>".getBytes())).isNull();
+        assertThat(MediaController.imageType(new byte[0])).isNull();
+        assertThat(MediaController.imageType("RIFF0000WAVEfmt ".getBytes())).isNull();
+    }
+
+    @Test
+    void keepsWebVttAndConvertsSubRipWithWindowsLineEnds() {
+        assertThat(MediaController.toWebVtt("WEBVTT\n\n00:01.000 --> 00:02.000\nHej")).isEqualTo("WEBVTT\n\n00:01.000 --> 00:02.000\nHej");
+        assertThat(MediaController.toWebVtt("\uFEFF1\r\n00:00:01,000 --> 00:00:02,000\r\nHej")).startsWith("WEBVTT\n\n1\n00:00:01.000");
+    }
 }

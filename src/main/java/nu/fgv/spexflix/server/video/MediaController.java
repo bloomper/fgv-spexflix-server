@@ -33,10 +33,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -75,7 +77,7 @@ public class MediaController {
 
         if (file != null) {
             return ResponseEntity.ok()
-                    .contentType(imageType(Files.readAllBytes(file)))
+                    .contentType(Objects.requireNonNullElse(imageType(head(file)), MediaType.IMAGE_JPEG))
                     .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
                     .body(new FileSystemResource(file));
         }
@@ -128,6 +130,15 @@ public class MediaController {
             throw new BadRequestException("error.subtitle.invalid");
         }
         return "WEBVTT\n\n" + SRT_TIME.matcher(content.replace("\r\n", "\n")).replaceAll("$1.$2");
+    }
+
+    /**
+     * The first bytes of a file, enough to tell what image it is, without reading all of it.
+     */
+    private static byte[] head(final Path file) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) {
+            return in.readNBytes(16);
+        }
     }
 
     static @Nullable MediaType imageType(final byte[] content) {

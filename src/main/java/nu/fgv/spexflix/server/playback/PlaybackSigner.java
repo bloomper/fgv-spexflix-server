@@ -16,7 +16,6 @@
 
 package nu.fgv.spexflix.server.playback;
 
-import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
 import org.springframework.stereotype.Component;
 
@@ -40,11 +39,8 @@ import java.util.Base64;
  * @author Anders Jacobsson
  * @since 1.0
  */
-@Slf4j
 @Component
 public class PlaybackSigner {
-
-    private static final String DEVELOPMENT_KEY = "spexflix-development-signing-key";
 
     private final String baseUrl;
     private final String key;
@@ -55,11 +51,10 @@ public class PlaybackSigner {
         final String configured = properties.media().signingKey();
 
         if (configured == null || configured.isBlank()) {
-            log.warn("MEDIA_SIGNING_KEY is not set; playback addresses are signed with a development key");
-            this.key = DEVELOPMENT_KEY;
-        } else {
-            this.key = configured.strip();
+            // Never fall back to a known key: anyone could sign addresses to every video with it
+            throw new IllegalStateException("API_MEDIA_SIGNING_KEY is not set");
         }
+        this.key = configured.strip();
     }
 
     /**

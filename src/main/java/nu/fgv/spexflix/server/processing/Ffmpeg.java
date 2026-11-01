@@ -43,6 +43,16 @@ public class Ffmpeg {
 
     private static final Duration PROBE_TIMEOUT = Duration.ofMinutes(2);
     private static final Duration TRANSCODE_TIMEOUT = Duration.ofHours(12);
+    /**
+     * Input options for video files people uploaded: local files and video containers only, so that a file posing as a
+     * playlist cannot make ffmpeg read other files or URLs into the video. They go before the {@code -i} they apply to.
+     */
+    public static final List<String> VIDEO_INPUT = List.of("-protocol_whitelist", "file",
+            "-format_whitelist", "mov,matroska,avi,mpegts,mpeg,dv,flv,asf,ogg,mxf,rm,m4v,h264,mpegvideo");
+    /**
+     * Input options for the HLS renditions Spexflix made itself.
+     */
+    public static final List<String> HLS_INPUT = List.of("-protocol_whitelist", "file", "-format_whitelist", "hls,mpegts");
 
     private final int priority;
     private final boolean nice;

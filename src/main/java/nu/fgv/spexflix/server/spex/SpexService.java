@@ -23,6 +23,7 @@ import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.config.CacheConfig;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.SpexregisterUnavailableException;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -114,9 +115,10 @@ public class SpexService {
     }
 
     /**
-     * Refreshes the copied spex data of every album, at night.
+     * Refreshes the copied spex data of every video, at night.
      */
     @Scheduled(cron = "0 15 3 * * *", zone = "Europe/Stockholm")
+    @SchedulerLock(name = "spex-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void refresh() {
         final List<Long> ids = videoRepository.findSpexIds();
@@ -127,13 +129,13 @@ public class SpexService {
         try {
             final Map<Long, SpexDto> spex = client.allSpex().stream().collect(Collectors.toMap(SpexDto::id, Function.identity(), (a, _) -> a));
 
-            for (final Video album : videoRepository.findBySpexIdIn(ids)) {
-                final SpexDto current = spex.get(album.getSpex().getId());
+            for (final Video video : videoRepository.findBySpexIdIn(ids)) {
+                final SpexDto current = spex.get(video.getSpex().getId());
 
                 if (current != null) {
-                    copy(current, album.getSpex());
-                } else if (StringUtils.hasText(album.getSpex().getTitle())) {
-                    log.warn("Spex {} of video {} is no longer in Spexregister", album.getSpex().getId(), album.getId());
+                    copy(current, video.getSpex());
+                } else if (StringUtils.hasText(video.getSpex().getTitle())) {
+                    log.warn("Spex {} of video {} is no longer in Spexregister", video.getSpex().getId(), video.getId());
                 }
             }
         } catch (final SpexregisterClient.SpexregisterCallException e) {

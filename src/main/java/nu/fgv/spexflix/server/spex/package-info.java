@@ -15,7 +15,7 @@
  */
 
 /**
- * Spex from Spexregister, which albums are linked to.
+ * Spex from Spexregister, which videos are linked to.
  */
 @NullMarked
 package nu.fgv.spexflix.server.spex;

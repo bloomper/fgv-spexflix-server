@@ -97,6 +97,26 @@ class TranscoderTest {
                 })).isInstanceOf(Transcoder.NotVideoException.class);
     }
 
+    @Test
+    void refusesAPlaylistPosingAsVideo(@TempDir final Path folder) throws IOException {
+        Assumptions.assumeTrue(hasFfmpeg(), "ffmpeg is not installed");
+
+        final Ffmpeg ffmpeg = new Ffmpeg(PROPERTIES);
+        // An upload has no extension; a playlist must not be read as one, or it could pull other files into the video
+        final Path playlist = Files.writeString(folder.resolve("upload"),
+                "#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.0,\n/etc/hosts\n#EXT-X-ENDLIST\n");
+
+        assertThat(new VideoProbe(ffmpeg, JsonMapper.builder().build()).probe(playlist)).isEmpty();
+    }
+
+    @Test
+    void readsUploadsAsVideoAndItsOwnRenditionsAsHls() {
+        assertThat(Transcoder.input(Path.of("/media/originals/abc.mp4")))
+                .containsSequence(Ffmpeg.VIDEO_INPUT).endsWith("-i", "/media/originals/abc.mp4");
+        assertThat(Transcoder.input(Path.of("/media/hls/abc/3/720/index.m3u8")))
+                .containsSequence(Ffmpeg.HLS_INPUT).endsWith("-i", "/media/hls/abc/3/720/index.m3u8");
+    }
+
     private static boolean hasFfmpeg() {
         try {
             return new ProcessBuilder("ffmpeg", "-version").start().waitFor() == 0;

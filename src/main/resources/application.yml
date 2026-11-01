@@ -7,6 +7,8 @@ spring:
     open-in-view: false
     properties:
       hibernate:
+        # Loads the collections of many videos in one query, not one per video
+        default_batch_fetch_size: 100
         transaction:
           jta:
             platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
@@ -82,7 +84,7 @@ spexflix:
     # The DNS-only media hostname served by spexflix-media (nginx)
     base-url: ${API_MEDIA_BASE_URL:https://media.spexflix.fgv.local.nu:8443}
     # Shared with spexflix-media, which checks the signed playback addresses
-    signing-key: ${MEDIA_SIGNING_KEY:}
+    signing-key: ${API_MEDIA_SIGNING_KEY:}
     link-margin: 4h
   worker:
     enabled: ${API_WORKER_ENABLED:false}
@@ -106,10 +108,10 @@ spring:
     schema:
       introspection:
         enabled: true
+  # The password comes from MYSQL_API_USER_PASSWORD, as in the container
   datasource:
     url: jdbc:mysql://localhost:3309/spexflix
     username: spexflix
-    password: spexflix
 
 server:
   port: 8083
@@ -123,5 +125,7 @@ spexflix:
     url: https://auth.fgv.local.nu:8443/auth
   media:
     base-url: http://localhost:8084
+    # A key for development only; every other environment sets API_MEDIA_SIGNING_KEY
+    signing-key: ${API_MEDIA_SIGNING_KEY:spexflix-development-signing-key}
   worker:
     enabled: true

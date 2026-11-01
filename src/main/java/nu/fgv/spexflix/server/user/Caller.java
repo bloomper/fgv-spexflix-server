@@ -40,7 +40,7 @@ public record Caller(String subject, String username, @Nullable String displayNa
     }
 
     /**
-     * Editors see unpublished albums and change the catalogue; admins can do everything editors can.
+     * Editors see unpublished videos and change the catalogue; admins can do everything editors can.
      */
     public boolean isEditor() {
         return isUser() && (roles.contains(Role.EDITOR) || roles.contains(Role.ADMIN));

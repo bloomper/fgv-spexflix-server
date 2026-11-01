@@ -19,7 +19,6 @@ package nu.fgv.spexflix.server.processing;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -38,15 +37,10 @@ public interface ProcessingJobRepository extends JpaRepository<ProcessingJob, Lo
 
     List<ProcessingJob> findByStatusAndLeaseUntilBefore(JobStatus status, Instant before);
 
-    List<ProcessingJob> findByStatusInOrderByCreatedAtAsc(Collection<JobStatus> statuses);
-
     @Query("SELECT j FROM ProcessingJob j JOIN FETCH j.video ORDER BY j.createdAt DESC")
     List<ProcessingJob> findRecent(Pageable pageable);
 
     Optional<ProcessingJob> findFirstByVideoIdOrderByCreatedAtDesc(Long videoId);
 
     boolean existsByVideoIdAndStatusIn(Long videoId, Collection<JobStatus> statuses);
-
-    @Query("SELECT j FROM ProcessingJob j WHERE j.video.id = :videoId AND j.status IN :statuses")
-    List<ProcessingJob> findActive(@Param("videoId") Long videoId, @Param("statuses") Collection<JobStatus> statuses);
 }

@@ -16,16 +16,35 @@
 
 package nu.fgv.spexflix.server.config;
 
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
+import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Turns on scheduled jobs: the daily deletion of participants' data that is no longer needed.
+ * Turns on scheduled jobs: the nightly refresh of spex data, the clean-up of abandoned uploads and, in the worker,
+ * video processing.
+ *
+ * <p>{@code spexflix-api} and {@code spexflix-worker} run the same image, so jobs that must not run twice at once take
+ * a ShedLock lock in the {@code shedlock} table. The database's clock decides when a lock expires, so the containers'
+ * clocks don't matter. The processing worker needs no lock: it claims jobs with leases of its own.</p>
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
+@EnableSchedulerLock(defaultLockAtMostFor = "PT30M")
 public class SchedulingConfig {
+
+    @Bean
+    public LockProvider lockProvider(final JdbcTemplate jdbcTemplate) {
+        return new JdbcTemplateLockProvider(JdbcTemplateLockProvider.Configuration.builder()
+                .withJdbcTemplate(jdbcTemplate)
+                .usingDbTime()
+                .build());
+    }
 }

@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PlaybackSignerTest {
 
@@ -40,5 +41,14 @@ class PlaybackSignerTest {
 
         assertThat(signer.prefix("abc", Instant.ofEpochSecond(1893456000L)))
                 .isEqualTo("https://media.example.org/v/1893456000/sNviqONfxzGbG5d2pvN1wQ/abc/");
+    }
+
+    @Test
+    void refusesToStartWithoutAKey() {
+        assertThatThrownBy(() -> new PlaybackSigner(new SpexflixProperties(null, null, null,
+                new SpexflixProperties.Media(null, null, "https://media.example.org/", " ", Duration.ofHours(4)),
+                null, null, null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("API_MEDIA_SIGNING_KEY");
     }
 }

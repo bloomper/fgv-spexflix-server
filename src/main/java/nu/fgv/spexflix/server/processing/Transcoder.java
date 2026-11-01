@@ -115,7 +115,9 @@ public class Transcoder {
 
     static List<String> renditionArguments(final Path source, final Path folder, final RenditionPlan.Step step,
                                            final VideoProbe.Result info) {
-        final List<String> arguments = new ArrayList<>(List.of("-i", source.toString(), "-map", "0:v:0"));
+        final List<String> arguments = input(source);
+
+        arguments.addAll(List.of("-map", "0:v:0"));
 
         if (info.audioCodec() != null) {
             arguments.addAll(List.of("-map", "0:a:0"));
@@ -164,9 +166,11 @@ public class Transcoder {
 
         try {
             Files.createDirectories(folder);
-            ffmpeg.ffmpeg(List.of("-i", source.toString(), "-vf",
-                    "fps=1/%d,scale=%d:%d,tile=%dx%d".formatted(interval, THUMB_WIDTH, height, TILES, TILES),
+            final List<String> arguments = input(source);
+
+            arguments.addAll(List.of("-vf", "fps=1/%d,scale=%d:%d,tile=%dx%d".formatted(interval, THUMB_WIDTH, height, TILES, TILES),
                     "-q:v", "5", folder.resolve("sprite_%03d.jpg").toString()));
+            ffmpeg.ffmpeg(arguments);
             Files.writeString(folder.resolve("thumbs.vtt"), thumbnailIndex(seconds, interval, height), StandardCharsets.UTF_8);
             return true;
         } catch (final IOException e) {
@@ -200,8 +204,22 @@ public class Transcoder {
      * Takes a frame as poster, 1280 pixels wide at most.
      */
     public void poster(final Path source, final Path target, final double seconds) throws IOException {
-        ffmpeg.ffmpeg(List.of("-ss", String.format(Locale.ROOT, "%.3f", Math.max(0, seconds)), "-i", source.toString(),
-                "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", target.toString()));
+        final List<String> arguments = new ArrayList<>(List.of("-ss", String.format(Locale.ROOT, "%.3f", Math.max(0, seconds))));
+
+        arguments.addAll(input(source));
+        arguments.addAll(List.of("-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", target.toString()));
+        ffmpeg.ffmpeg(arguments);
+    }
+
+    /**
+     * {@code -i source}, after the options that keep ffmpeg to what the source should be: an uploaded video, or the
+     * HLS renditions Spexflix made itself.
+     */
+    static List<String> input(final Path source) {
+        final List<String> arguments = new ArrayList<>(source.getFileName().toString().endsWith(".m3u8") ? Ffmpeg.HLS_INPUT : Ffmpeg.VIDEO_INPUT);
+
+        arguments.addAll(List.of("-i", source.toString()));
+        return arguments;
     }
 
     private static long folderSize(final Path folder) throws IOException {

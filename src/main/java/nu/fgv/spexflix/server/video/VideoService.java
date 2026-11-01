@@ -208,7 +208,7 @@ public class VideoService {
 
         apply(video, input);
         videoRepository.save(video);
-        auditService.record("CREATE", "VIDEO", video.getId(), "Skapade videon " + video.getTitle());
+        auditService.record("CREATE", "VIDEO", video.getId(), "Skapade filmen " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 
@@ -219,7 +219,7 @@ public class VideoService {
         final Video video = editable(id);
 
         apply(video, input);
-        auditService.record("UPDATE", "VIDEO", video.getId(), "Ändrade videon " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getId(), "Ändrade filmen " + video.getTitle());
         return VideoDtos.toDto(video);
     }
 

@@ -18,8 +18,6 @@ package nu.fgv.spexflix.server.user;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,10 +29,4 @@ import java.util.Optional;
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findBySubject(String subject);
-
-    Optional<AppUser> findByUsername(String username);
-
-    List<AppUser> findAllByOrderByLastSeenAtDesc();
-
-    List<AppUser> findByLastSeenAtBefore(Instant before);
 }

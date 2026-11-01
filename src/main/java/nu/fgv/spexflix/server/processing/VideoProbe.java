@@ -23,6 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,8 +49,10 @@ public class VideoProbe {
      */
     public Optional<Result> probe(final Path file) {
         try {
-            return parse(jsonMapper.readTree(ffmpeg.probe(List.of("-v", "error", "-print_format", "json", "-show_format",
-                    "-show_streams", file.toString()))));
+            final List<String> arguments = new ArrayList<>(Ffmpeg.VIDEO_INPUT);
+
+            arguments.addAll(List.of("-v", "error", "-print_format", "json", "-show_format", "-show_streams", file.toString()));
+            return parse(jsonMapper.readTree(ffmpeg.probe(arguments)));
         } catch (final IOException | RuntimeException e) {
             return Optional.empty();
         }

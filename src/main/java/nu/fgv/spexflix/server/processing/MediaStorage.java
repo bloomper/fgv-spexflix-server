@@ -33,10 +33,10 @@ import java.util.stream.Stream;
  * The media folder. Video files are named by id, never by title:
  *
  * <pre>
- * originals/<uuid>/original.<ext>               the uploaded file, the archive copy; never served
- * originals/<uuid>/pending-<job>.<ext>          a replacement waiting to be processed
- * hls/<uuid>/<generation>/master.m3u8           the renditions, thumbnails and poster, served by spexflix-media
- * hls/<uuid>/subtitles/<language>.vtt           subtitles, kept across generations
+ * originals/&lt;uuid&gt;/original.&lt;ext&gt;               the uploaded file, the archive copy; never served
+ * originals/&lt;uuid&gt;/pending-&lt;job&gt;.&lt;ext&gt;          a replacement waiting to be processed
+ * hls/&lt;uuid&gt;/&lt;generation&gt;/master.m3u8           the renditions, thumbnails and poster, served by spexflix-media
+ * hls/&lt;uuid&gt;/subtitles/&lt;language&gt;.vtt           subtitles, kept across generations
  * uploads/                                      unfinished uploads
  * trash/                                        nothing: trashed videos keep their files until deleted
  * </pre>
