@@ -119,6 +119,12 @@ Files live in the media folder (``API_MEDIA_ROOT``), never in the database:
 ``playback(videoId)`` returns signed, expiring addresses on the media server for the HLS playlist, the timeline thumbnails and the subtitles, valid for the video's duration plus four hours.
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
 Progress (``progressSave``) and the watch list are per user.
+``videoMarkWatched`` marks a video as watched, starting from the beginning next time; ``progressClear`` forgets the position, which takes the video off ``continueWatching``.
+
+Collections (``collections``, ``collection``) hold videos in an order of their own; a video can be in several.
+Listeners see a collection's listed videos only, and only collections with one.
+Editors create and change collections (``collectionCreate``, ``collectionUpdate``); only admins delete them, and their videos stay.
+``Video.next`` is what plays after a video: the next listed video in its first collection, by title, that has one after it, else the next listed video of the same spex by kind and performance date.
 
 Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 ``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.
@@ -128,6 +134,7 @@ Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 
 Editors' changes are recorded in the audit log (``auditLog``): who, when, what and a summary.
 Editors see their own changes, admins everyone's.
+``AuditFilter`` narrows the log by kind of record, action, person (admins only), period, text in the summary or one record (``entityId``); ``auditActors`` lists the people in the log the caller may see.
 
 [[spexregister]]
 == Spexregister

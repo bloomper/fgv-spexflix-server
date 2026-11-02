@@ -137,6 +137,31 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewersClearTheirPlaceOrMarkAVideoWatched() throws Exception {
+        final String videoId = readyVideo(folder, true);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { progressSave(videoId: $id, positionSeconds: 4) }").variable("id", videoId).execute();
+        graphQl(VIEWER).document("mutation($id: ID!) { progressClear(videoId: $id) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { progressSeconds finished } continueWatching { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.progressSeconds").valueIsNull()
+                .path("video.finished").entity(Boolean.class).isEqualTo(false)
+                .path("continueWatching").entityList(Object.class).hasSize(0);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { progressSave(videoId: $id, positionSeconds: 4) }").variable("id", videoId).execute();
+        graphQl(VIEWER).document("mutation($id: ID!) { videoMarkWatched(videoId: $id) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { progressSeconds finished } continueWatching { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.progressSeconds").entity(Integer.class).isEqualTo(0)
+                .path("video.finished").entity(Boolean.class).isEqualTo(true)
+                .path("continueWatching").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
     void subtitlesAreConvertedAndPlayed() throws Exception {
         final String videoId = readyVideo(folder, true);
         final MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();

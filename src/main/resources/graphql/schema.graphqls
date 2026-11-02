@@ -18,6 +18,10 @@ type Query {
     watchList: [Video!]!
     "USER. Listed videos the caller rated, highest first."
     highestRated(limit: Int = 12): [Video!]!
+    "USER. Collections with a listed video, by title; every collection for EDITOR."
+    collections: [Collection!]!
+    "USER. A collection with a listed video; any collection for EDITOR."
+    collection(id: ID!): Collection
     "USER. The video kinds, in order; the first is the default."
     videoKinds: [VideoKind!]!
     "USER. The categories of the published videos."
@@ -40,8 +44,10 @@ type Query {
     processingQueue: [ProcessingJob!]!
     "ADMIN. Space used by originals and renditions, and left on the volume."
     storage: Storage!
-    "EDITOR. The audit log: the caller's own changes, or everyone's for ADMIN."
-    auditLog(page: Int = 0, size: Int = 50): AuditPage!
+    "EDITOR. The audit log, newest first: the caller's own changes, or everyone's for ADMIN, narrowed by the filter."
+    auditLog(page: Int = 0, size: Int = 50, filter: AuditFilter): AuditPage!
+    "EDITOR. Who made the changes in the audit log the caller sees, with their latest names; only the caller unless ADMIN."
+    auditActors: [AuditActor!]!
     "ADMIN. The scheduled maintenance jobs, with their schedules and how their latest runs went."
     maintenanceJobs: [MaintenanceJobStatus!]!
 }
@@ -73,12 +79,22 @@ type Mutation {
     subtitleRemove(videoId: ID!, language: String!): Video!
     "USER. Where the caller is in a video; finished when near the end."
     progressSave(videoId: ID!, positionSeconds: Int!): Void
+    "USER. Forgets where the caller is in a video, which takes it off continue watching and marks it unwatched."
+    progressClear(videoId: ID!): Void
+    "USER. Marks a video as watched to the end; the next time it starts from the beginning."
+    videoMarkWatched(videoId: ID!): Void
     "USER. Rates a video from 1 to 5; 0 removes the caller's rating."
     videoRate(videoId: ID!, rating: Int!): Void
     "USER."
     watchListAdd(videoId: ID!): Void
     "USER."
     watchListRemove(videoId: ID!): Void
+    "EDITOR. The videos in the given order; trashed ones are refused."
+    collectionCreate(input: CollectionInput!): Collection!
+    "EDITOR. Replaces the title, description and videos."
+    collectionUpdate(id: ID!, input: CollectionInput!): Collection!
+    "ADMIN. The videos stay."
+    collectionDelete(id: ID!): Void
     "ADMIN. Added last."
     videoKindCreate(input: VideoKindInput!): VideoKind!
     "ADMIN."
@@ -231,6 +247,10 @@ type Video {
     "Everyone's average rating, or null when nobody has rated it."
     averageRating: Float
     ratingCount: Int!
+    "The collections the video is in, by title."
+    collections: [CollectionRef!]!
+    "What plays after this video: the next in its first collection that has one, else the next of the same spex by kind and performance date. Ask for one video at a time."
+    next: Video
     "The latest processing job, for EDITOR."
     job: ProcessingJob
     createdAt: Instant!
@@ -317,6 +337,8 @@ type AuditPage {
 type AuditLogEntry {
     id: ID!
     at: Instant!
+    "Who made the change, by their subject."
+    actorId: String!
     actorName: String
     action: String!
     entityType: String!
@@ -344,4 +366,49 @@ type MaintenanceJobStatus {
     lastFinishedAt: Instant
     "Whether the latest run finished without an error; null while it runs."
     lastSucceeded: Boolean
+}
+
+"Videos grouped in an order of their own, e.g. a spex's shows over the years."
+type Collection {
+    id: ID!
+    title: String!
+    description: String
+    "Listed videos for listeners; every video not in the trash for EDITOR."
+    videos: [Video!]!
+    createdAt: Instant!
+    lastModifiedAt: Instant
+}
+
+type CollectionRef {
+    id: ID!
+    title: String!
+}
+
+input CollectionInput {
+    title: String!
+    description: String
+    videoIds: [ID!]!
+}
+
+"What to show of the audit log; every field is optional."
+input AuditFilter {
+    "What was changed, e.g. ALBUM or VIDEO."
+    entityType: String
+    "CREATE, UPDATE, DELETE and so on."
+    action: String
+    "Who made the change; only ADMIN sees others' changes."
+    actorId: String
+    "Changes from this instant on."
+    from: Instant
+    "Changes before this instant."
+    to: Instant
+    "Text the summary contains."
+    q: String
+    "One record's changes."
+    entityId: ID
+}
+
+type AuditActor {
+    id: String!
+    name: String
 }

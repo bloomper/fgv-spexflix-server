@@ -309,7 +309,7 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void resetState() throws IOException {
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
-        for (final String table : List.of("audit_entry", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
+        for (final String table : List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
                 "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }

@@ -220,4 +220,29 @@ class PlaybackServiceTest {
 
         assertThat(service.ratingSummaries(List.of(uuid(1)))).containsEntry(uuid(1), new PlaybackService.RatingSummary(3.5, 2));
     }
+
+    @Test
+    void markingAVideoWatchedStartsItFromTheBeginningNextTime() {
+        final WatchProgress existing = new WatchProgress();
+
+        existing.setPositionSeconds(300);
+        when(progressRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.of(existing));
+        service.markWatched(uuid(1));
+
+        assertThat(existing.isFinished()).isTrue();
+        assertThat(existing.getPositionSeconds()).isZero();
+        assertThat(existing.getUpdatedAt()).isEqualTo(NOW);
+        verify(progressRepository).save(existing);
+    }
+
+    @Test
+    void clearingProgressForgetsWhereTheViewerWas() {
+        final WatchProgress existing = new WatchProgress();
+
+        when(videoRepository.findByUuid(uuid(1))).thenReturn(Optional.of(video));
+        when(progressRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.of(existing));
+        service.clearProgress(uuid(1));
+
+        verify(progressRepository).delete(existing);
+    }
 }

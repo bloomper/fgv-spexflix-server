@@ -260,6 +260,18 @@ public class VideoGraphqlApi {
     }
 
     @MutationMapping
+    public @Nullable Void progressClear(@Argument final UUID videoId) {
+        playbackService.clearProgress(videoId);
+        return null;
+    }
+
+    @MutationMapping
+    public @Nullable Void videoMarkWatched(@Argument final UUID videoId) {
+        playbackService.markWatched(videoId);
+        return null;
+    }
+
+    @MutationMapping
     public @Nullable Void videoRate(@Argument final UUID videoId, @Argument final int rating) {
         playbackService.rate(videoId, rating);
         return null;
