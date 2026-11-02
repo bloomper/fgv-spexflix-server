@@ -18,7 +18,8 @@ package nu.fgv.spexflix.server.video;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -30,6 +31,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -64,8 +66,13 @@ public class Video extends AbstractAuditable {
     @Column(name = "uuid", nullable = false, updatable = false, length = 36)
     private UUID uuid = Uuids.v7();
 
-    @Embedded
-    private SpexRef spex = new SpexRef();
+    /**
+     * The spex the video is about, the main one first; empty when it is not about any spex.
+     */
+    @ElementCollection
+    @CollectionTable(name = "video_spex", joinColumns = @JoinColumn(name = "video_id"))
+    @OrderColumn(name = "position")
+    private List<SpexRef> spex = new ArrayList<>();
 
     @Column(name = "title", nullable = false)
     private String title;
@@ -148,13 +155,17 @@ public class Video extends AbstractAuditable {
     private List<Subtitle> subtitles = new ArrayList<>();
 
     /**
-     * The spex, never null: Hibernate loads an embedded value whose columns are all null as null.
+     * The main spex, which the poster, the default title and year and the category come from.
      */
-    public SpexRef getSpex() {
-        if (spex == null) {
-            spex = new SpexRef();
-        }
-        return spex;
+    public @Nullable SpexRef mainSpex() {
+        return spex.isEmpty() ? null : spex.getFirst();
+    }
+
+    /**
+     * Whether the video is about the spex or, when it is an original, one of its revivals.
+     */
+    public boolean isAbout(final UUID spexId) {
+        return spex.stream().anyMatch(ref -> spexId.equals(ref.getId()) || spexId.equals(ref.getParentId()));
     }
 
     public boolean isTrashed() {

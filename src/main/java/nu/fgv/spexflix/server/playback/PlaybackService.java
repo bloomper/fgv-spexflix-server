@@ -125,6 +125,39 @@ public class PlaybackService {
         progressRepository.save(progress);
     }
 
+    /**
+     * Forgets where the caller is in a video: off continue watching, and unwatched.
+     */
+    @Transactional
+    public void clearProgress(final UUID videoId) {
+        final AppUser user = currentUser();
+
+        videoRepository.findByUuid(videoId)
+                .flatMap(video -> progressRepository.findByUserIdAndVideoId(user.getId(), video.getId()))
+                .ifPresent(progressRepository::delete);
+    }
+
+    /**
+     * Marks a video as watched to the end, at position 0 so that it starts from the beginning the next time.
+     */
+    @Transactional
+    public void markWatched(final UUID videoId) {
+        final Video video = videoService.visible(videoId);
+        final AppUser user = currentUser();
+        final WatchProgress progress = progressRepository.findByUserIdAndVideoId(user.getId(), video.getId()).orElseGet(() -> {
+            final WatchProgress created = new WatchProgress();
+
+            created.setUserId(user.getId());
+            created.setVideoId(video.getId());
+            return created;
+        });
+
+        progress.setPositionSeconds(0);
+        progress.setFinished(true);
+        progress.setUpdatedAt(clock.instant());
+        progressRepository.save(progress);
+    }
+
     @Transactional(readOnly = true)
     public List<VideoDto> continueWatching(final int limit) {
         final AppUser user = currentUser();

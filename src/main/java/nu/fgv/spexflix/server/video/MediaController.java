@@ -116,8 +116,8 @@ public class MediaController {
                     .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
                     .body(new FileSystemResource(file));
         }
-        if (video.getSpex().getId() != null) {
-            return spexService.poster(video.getSpex().getId())
+        if (video.mainSpex() != null) {
+            return spexService.poster(video.mainSpex().getId())
                     .<ResponseEntity<?>>map(poster -> ResponseEntity.ok()
                             .contentType(MediaType.parseMediaType(poster.contentType()))
                             .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())

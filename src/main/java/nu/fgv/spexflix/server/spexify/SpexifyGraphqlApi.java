@@ -19,6 +19,7 @@ package nu.fgv.spexflix.server.spexify;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.video.ChapterRepository;
+import nu.fgv.spexflix.server.video.VideoDtos;
 import nu.fgv.spexflix.server.video.VideoService;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -52,7 +53,8 @@ public class SpexifyGraphqlApi {
     }
 
     /**
-     * The tracks an editor can link the video's chapters to: those of the video's spex.
+     * The tracks an editor can link the video's chapters to: those of the video's spex and, for originals, their
+     * revivals.
      */
     @QueryMapping
     public List<SpexifyClient.Track> spexifyTracks(@Argument final UUID videoId) {
@@ -60,7 +62,8 @@ public class SpexifyGraphqlApi {
 
         final var video = videoService.video(videoId);
 
-        return video == null || video.spex() == null ? List.of() : client.tracks(video.spex().id());
+        return video == null || video.spex().isEmpty() ? List.of()
+                : client.tracks(video.spex().stream().map(VideoDtos.VideoSpexDto::familyId).distinct().toList());
     }
 
     /**

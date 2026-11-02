@@ -137,6 +137,31 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewersClearTheirPlaceOrMarkAVideoWatched() throws Exception {
+        final String videoId = readyVideo(folder, true);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { progressSave(videoId: $id, positionSeconds: 4) }").variable("id", videoId).execute();
+        graphQl(VIEWER).document("mutation($id: ID!) { progressClear(videoId: $id) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { progressSeconds finished } continueWatching { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.progressSeconds").valueIsNull()
+                .path("video.finished").entity(Boolean.class).isEqualTo(false)
+                .path("continueWatching").entityList(Object.class).hasSize(0);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { progressSave(videoId: $id, positionSeconds: 4) }").variable("id", videoId).execute();
+        graphQl(VIEWER).document("mutation($id: ID!) { videoMarkWatched(videoId: $id) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { progressSeconds finished } continueWatching { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.progressSeconds").entity(Integer.class).isEqualTo(0)
+                .path("video.finished").entity(Boolean.class).isEqualTo(true)
+                .path("continueWatching").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
     void subtitlesAreConvertedAndPlayed() throws Exception {
         final String videoId = readyVideo(folder, true);
         final MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
@@ -172,7 +197,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void onlyReadyVideosArePlayedOrPublished() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b003\"}) { id } }")
+                .document("mutation { videoCreate(input: {spexIds: [\"00000000-0000-7000-8000-000000000001\"], kindId: \"00000000-0000-7000-8000-00000000b003\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 
@@ -201,7 +226,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotSeeUnpublishedVideos() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b002\"}) { id } }")
+                .document("mutation { videoCreate(input: {spexIds: [\"00000000-0000-7000-8000-000000000001\"], kindId: \"00000000-0000-7000-8000-00000000b002\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 

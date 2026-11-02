@@ -53,15 +53,19 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
 
     List<Video> findByTrashedAtIsNotNullOrderByTrashedAtDesc();
 
-    @Query("SELECT DISTINCT v.spex.id FROM Video v WHERE v.spex.id IS NOT NULL")
-    List<UUID> findSpexIds();
+    @Query("SELECT DISTINCT v FROM Video v JOIN v.spex s")
+    List<Video> findWithSpex();
 
-    List<Video> findBySpexIdIn(Collection<UUID> spexIds);
+    /**
+     * Videos about one of the spex or, for originals, one of their revivals.
+     */
+    @Query("SELECT DISTINCT v FROM Video v JOIN v.spex s WHERE s.id IN :spexIds OR s.parentId IN :spexIds")
+    List<Video> findAboutSpex(@Param("spexIds") Collection<UUID> spexIds);
 
     @Query("""
-            SELECT DISTINCT v FROM Video v LEFT JOIN v.chapters c
+            SELECT DISTINCT v FROM Video v LEFT JOIN v.chapters c LEFT JOIN v.spex s
             WHERE v.trashedAt IS NULL AND (:editor = TRUE OR (v.published = TRUE AND v.status = nu.fgv.spexflix.server.video.VideoStatus.READY))
-              AND (LOWER(v.title) LIKE :q OR LOWER(v.spex.title) LIKE :q OR LOWER(v.description) LIKE :q
+              AND (LOWER(v.title) LIKE :q OR LOWER(s.title) LIKE :q OR LOWER(v.description) LIKE :q
                    OR LOWER(v.performance) LIKE :q OR LOWER(c.title) LIKE :q)
             ORDER BY v.year DESC, v.title ASC""")
     List<Video> search(@Param("q") String pattern, @Param("editor") boolean editor);

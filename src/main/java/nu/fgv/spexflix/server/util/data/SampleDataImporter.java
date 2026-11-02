@@ -39,9 +39,12 @@ import nu.fgv.spexflix.server.user.AppUser;
 import nu.fgv.spexflix.server.user.AppUserRepository;
 import nu.fgv.spexflix.server.util.security.SecurityUtil;
 import nu.fgv.spexflix.server.video.Chapter;
+import nu.fgv.spexflix.server.video.SpexRef;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoKind;
+import nu.fgv.spexflix.server.video.VideoCollection;
+import nu.fgv.spexflix.server.video.VideoCollectionRepository;
 import nu.fgv.spexflix.server.video.VideoKindRepository;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoStatus;
@@ -78,6 +81,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Replaces everything with sample data at every start while {@code spexflix.data.import-sample-data} is set: the
@@ -103,7 +107,7 @@ public class SampleDataImporter {
     static final String NO_ACCESS = "no-access@fgv.nu";
     private static final int SPEXREGISTER_ATTEMPTS = 30;
     private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
-    private static final List<String> TABLES = List.of("audit_entry", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
+    private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
             "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
     private static final List<String> CHAPTERS = List.of("Ouvertyr", "Öppningskören", "Kärleksduetten", "Hovets klagan",
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
@@ -139,6 +143,7 @@ public class SampleDataImporter {
     private final ProcessingWorker worker;
     private final VideoRepository videoRepository;
     private final VideoKindRepository videoKindRepository;
+    private final VideoCollectionRepository collectionRepository;
     private final ProcessingJobRepository jobRepository;
     private final AppUserRepository userRepository;
     private final WatchProgressRepository progressRepository;
@@ -152,7 +157,7 @@ public class SampleDataImporter {
                               final SpexService spexService, final SpexifyClient spexifyClient, final Keycloak keycloak,
                               final MediaStorage storage, final Ffmpeg ffmpeg, final ProcessingWorker worker,
                               final VideoRepository videoRepository, final VideoKindRepository videoKindRepository,
-                              final ProcessingJobRepository jobRepository,
+                              final VideoCollectionRepository collectionRepository, final ProcessingJobRepository jobRepository,
                               final AppUserRepository userRepository, final WatchProgressRepository progressRepository,
                               final WatchListEntryRepository watchListRepository, final AuditEntryRepository auditRepository,
                               final Clock clock) {
@@ -169,6 +174,7 @@ public class SampleDataImporter {
         this.worker = worker;
         this.videoRepository = videoRepository;
         this.videoKindRepository = videoKindRepository;
+        this.collectionRepository = collectionRepository;
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
         this.progressRepository = progressRepository;
@@ -277,6 +283,7 @@ public class SampleDataImporter {
                 }
             }
             transactionTemplate.executeWithoutResult(_ -> createViewing(users.get(USER)));
+            transactionTemplate.executeWithoutResult(_ -> createCollection());
             transactionTemplate.executeWithoutResult(_ -> createAudit(users.get(EDITOR)));
         } finally {
             FileSystemUtils.deleteRecursively(sourcesFolder);
@@ -406,7 +413,10 @@ public class SampleDataImporter {
         final boolean show = kind == kinds.getFirst();
 
         video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)));
-        spexService.copy(picked, video.getSpex());
+        final SpexRef ref = new SpexRef();
+
+        spexService.copy(picked, ref);
+        video.getSpex().add(ref);
         video.setKind(kind);
         video.setTitle(show ? String.valueOf(picked.title()) : picked.title() + " – " + kind.getNameSv().toLowerCase(java.util.Locale.ROOT));
         video.setYear(picked.year());
@@ -455,7 +465,7 @@ public class SampleDataImporter {
     }
 
     private void addChapters(final Video video, final UUID spexId) {
-        final List<SpexifyClient.Track> tracks = spexifyClient.tracks(spexId);
+        final List<SpexifyClient.Track> tracks = spexifyClient.tracks(List.of(spexId));
 
         for (int i = 0; i < 5; i++) {
             final Chapter chapter = new Chapter();
@@ -529,6 +539,29 @@ public class SampleDataImporter {
             entry.setAddedAt(now.minus(Duration.ofDays(i)));
             watchListRepository.save(entry);
         }
+    }
+
+    /**
+     * One collection: every video of the spex with the most videos, oldest first.
+     */
+    private void createCollection() {
+        videoRepository.findAll().stream()
+                .filter(video -> !video.isTrashed() && video.mainSpex() != null)
+                .collect(Collectors.groupingBy(video -> video.mainSpex().familyId()))
+                .values().stream()
+                .filter(videos -> videos.size() > 1)
+                .max(Comparator.comparingInt(List::size))
+                .ifPresent(videos -> {
+                    final VideoCollection collection = new VideoCollection();
+                    final Video first = videos.getFirst();
+
+                    collection.setTitle(Objects.requireNonNullElse(first.mainSpex().getTitle(), first.getTitle()) + " genom åren");
+                    collection.setDescription("Alla filmer från spexet, i tur och ordning.");
+                    collection.getVideos().addAll(videos.stream()
+                            .sorted(Comparator.comparing(Video::getYear, Comparator.nullsLast(Comparator.<Integer>naturalOrder())).thenComparing(Video::getId))
+                            .toList());
+                    collectionRepository.save(collection);
+                });
     }
 
     private void createAudit(final AppUser editor) {

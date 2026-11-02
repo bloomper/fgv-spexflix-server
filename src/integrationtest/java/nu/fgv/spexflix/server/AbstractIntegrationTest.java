@@ -309,7 +309,7 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void resetState() throws IOException {
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
-        for (final String table : List.of("audit_entry", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
+        for (final String table : List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
                 "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }
@@ -370,7 +370,7 @@ public abstract class AbstractIntegrationTest {
      */
     protected String readyVideo(final Path folder, final boolean publish) throws IOException, InterruptedException {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\"}) { id status } }")
+                .document("mutation { videoCreate(input: {spexIds: [\"00000000-0000-7000-8000-000000000001\"]}) { id status } }")
                 .execute()
                 .path("videoCreate.status").entity(String.class).isEqualTo("UPLOADING")
                 .path("videoCreate.id").entity(String.class).get();
