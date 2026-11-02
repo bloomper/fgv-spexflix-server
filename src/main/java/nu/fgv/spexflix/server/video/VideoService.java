@@ -151,6 +151,7 @@ public class VideoService {
                 .filter(candidate -> candidate.isListed() || caller.isEditor())
                 .orElseThrow(() -> new ResourceNotFoundException("error.video.notFound", id));
 
+        video.getSpex().size();
         video.getSubtitles().size();
         return video;
     }
