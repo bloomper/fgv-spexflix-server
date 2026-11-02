@@ -73,6 +73,7 @@ public class VideoService {
     private static final int MAX_CHAPTERS = 200;
 
     private final VideoRepository videoRepository;
+    private final VideoKindService kindService;
     private final ProcessingJobRepository jobRepository;
     private final CallerService callerService;
     private final SpexService spexService;
@@ -82,11 +83,13 @@ public class VideoService {
     private final AuditService auditService;
     private final Clock clock;
 
-    public VideoService(final VideoRepository videoRepository, final ProcessingJobRepository jobRepository,
+    public VideoService(final VideoRepository videoRepository, final VideoKindService kindService,
+                        final ProcessingJobRepository jobRepository,
                         final CallerService callerService, final SpexService spexService, final UploadService uploadService,
                         final MediaStorage storage, final Transcoder transcoder, final AuditService auditService,
                         final Clock clock) {
         this.videoRepository = videoRepository;
+        this.kindService = kindService;
         this.jobRepository = jobRepository;
         this.callerService = callerService;
         this.spexService = spexService;
@@ -115,7 +118,7 @@ public class VideoService {
                 .filter(video -> filter == null || filter.categoryId() == null || filter.categoryId().equals(video.getSpex().getCategoryId()))
                 .filter(video -> filter == null || filter.year() == null || filter.year().equals(video.getYear()))
                 .filter(video -> filter == null || filter.spexId() == null || filter.spexId().equals(video.getSpex().getId()))
-                .filter(video -> filter == null || filter.kind() == null || filter.kind() == video.getKind())
+                .filter(video -> filter == null || filter.kindId() == null || filter.kindId().equals(video.getKind().getUuid()))
                 .map(VideoDtos::toDto)
                 .toList();
     }
@@ -246,7 +249,7 @@ public class VideoService {
         }
         video.setTitle(limit(title));
         video.setYear(input.year() != null ? input.year() : video.getSpex().getYear());
-        video.setKind(input.kind());
+        video.setKind(input.kindId() == null && video.getKind() != null ? video.getKind() : kindService.kindOrDefault(input.kindId()));
         video.setPerformance(StringUtils.hasText(input.performance()) ? limit(input.performance().strip()) : null);
         video.setDescription(StringUtils.hasText(input.description()) ? input.description().strip() : null);
         try {

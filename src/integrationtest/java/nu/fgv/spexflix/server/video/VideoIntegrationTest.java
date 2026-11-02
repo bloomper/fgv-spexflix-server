@@ -87,6 +87,33 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewersRateVideosAndSeeEveryonesAverage() throws Exception {
+        final String videoId = readyVideo(folder, true);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { videoRate(videoId: $id, rating: 4) }").variable("id", videoId).execute().errors().verify();
+        graphQl(EDITOR).document("mutation($id: ID!) { videoRate(videoId: $id, rating: 1) }").variable("id", videoId).execute().errors().verify();
+        expectError(graphQl(VIEWER).document("mutation($id: ID!) { videoRate(videoId: $id, rating: 6) }").variable("id", videoId).execute(), "BAD_REQUEST");
+
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { myRating averageRating ratingCount } highestRated { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.myRating").entity(Integer.class).isEqualTo(4)
+                .path("video.averageRating").entity(Double.class).isEqualTo(2.5)
+                .path("video.ratingCount").entity(Integer.class).isEqualTo(2)
+                .path("highestRated[0].id").entity(String.class).isEqualTo(videoId);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { videoRate(videoId: $id, rating: 0) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER)
+                .document("query($id: ID!) { video(id: $id) { myRating ratingCount } highestRated { id } }")
+                .variable("id", videoId)
+                .execute()
+                .path("video.myRating").entity(Integer.class).isEqualTo(0)
+                .path("video.ratingCount").entity(Integer.class).isEqualTo(1)
+                .path("highestRated").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
     void viewersKeepTheirPlaceAndAWatchList() throws Exception {
         final String videoId = readyVideo(folder, true);
 
@@ -145,7 +172,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void onlyReadyVideosArePlayedOrPublished() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: TRAILER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b003\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 
@@ -174,7 +201,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotSeeUnpublishedVideos() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: NUMBER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b002\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 

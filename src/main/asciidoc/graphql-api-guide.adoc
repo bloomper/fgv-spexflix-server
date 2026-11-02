@@ -90,6 +90,9 @@ Every service method resolves the caller and checks the role before it acts; Gra
 A video belongs to a spex in Spexregister and starts unpublished, waiting for its file.
 Its file is uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``videoSetFile``, which queues it.
 
+Every video has a kind (``videoKinds``), e.g. a full show or a trailer, with a Swedish and an English name.
+Admins add, rename, reorder and delete kinds; the first is the default for new videos, and a kind that any video uses, trashed ones included, cannot be deleted.
+
 A worker, the same application with ``API_WORKER_ENABLED=true``, processes one job at a time, kept in the database so it survives restarts; a job whose lease runs out starts over.
 ffprobe reads the original; ffmpeg makes 1080p, 720p and 480p (never above the original), H.264 and AAC, 6-second segments with aligned keyframes, deinterlacing and loudness normalisation.
 An H.264/AAC original of at most 1080p is copied into the top rendition instead.
@@ -116,6 +119,9 @@ Files live in the media folder (``API_MEDIA_ROOT``), never in the database:
 ``playback(videoId)`` returns signed, expiring addresses on the media server for the HLS playlist, the timeline thumbnails and the subtitles, valid for the video's duration plus four hours.
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
 Progress (``progressSave``) and the watch list are per user.
+
+Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
+``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.
 
 [[audit]]
 == Audit

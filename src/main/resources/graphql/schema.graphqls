@@ -16,6 +16,10 @@ type Query {
     continueWatching(limit: Int = 12): [Video!]!
     "USER. The caller's watch list."
     watchList: [Video!]!
+    "USER. Listed videos the caller rated, highest first."
+    highestRated(limit: Int = 12): [Video!]!
+    "USER. The video kinds, in order; the first is the default."
+    videoKinds: [VideoKind!]!
     "USER. The categories of the published videos."
     categories: [Category!]!
     "USER. The years of the published videos, newest first."
@@ -69,10 +73,20 @@ type Mutation {
     subtitleRemove(videoId: ID!, language: String!): Video!
     "USER. Where the caller is in a video; finished when near the end."
     progressSave(videoId: ID!, positionSeconds: Int!): Void
+    "USER. Rates a video from 1 to 5; 0 removes the caller's rating."
+    videoRate(videoId: ID!, rating: Int!): Void
     "USER."
     watchListAdd(videoId: ID!): Void
     "USER."
     watchListRemove(videoId: ID!): Void
+    "ADMIN. Added last."
+    videoKindCreate(input: VideoKindInput!): VideoKind!
+    "ADMIN."
+    videoKindUpdate(id: ID!, input: VideoKindInput!): VideoKind!
+    "ADMIN. Every kind, in the new order; the first becomes the default."
+    videoKindsReorder(ids: [ID!]!): [VideoKind!]!
+    "ADMIN. Only a kind no video uses, trashed ones included, and not the last one."
+    videoKindDelete(id: ID!): Void
     "ADMIN."
     settingsUpdate(input: SettingsInput!): Settings!
     "ADMIN. Starts the job in the background, as its schedule would. False when it is already running."
@@ -102,12 +116,21 @@ input SettingsInput {
     keepOriginals: Boolean!
 }
 
-enum VideoKind {
-    FULL_SHOW
-    NUMBER
-    TRAILER
-    BEHIND_THE_SCENES
-    OTHER
+"What a video is, e.g. a full show or a trailer. Configured by admins."
+type VideoKind {
+    id: ID!
+    nameSv: String!
+    nameEn: String!
+    position: Int!
+    "The first by position: used for new videos."
+    isDefault: Boolean!
+    "Videos of this kind, trashed ones included."
+    videoCount: Int!
+}
+
+input VideoKindInput {
+    nameSv: String!
+    nameEn: String!
 }
 
 enum VideoStatus {
@@ -121,7 +144,7 @@ input VideoFilter {
     categoryId: ID
     year: Int
     spexId: ID
-    kind: VideoKind
+    kindId: ID
     "EDITOR only."
     includeUnpublished: Boolean
 }
@@ -132,7 +155,8 @@ input VideoInput {
     "Defaults to the spex title and year."
     title: String
     year: Int
-    kind: VideoKind!
+    "A video kind; defaults to the first one for a new video and to the current one for an existing video."
+    kindId: ID
     "e.g. Premiere"
     performance: String
     "yyyy-mm-dd"
@@ -202,6 +226,11 @@ type Video {
     "Whether the caller has watched to the end."
     finished: Boolean!
     inWatchList: Boolean!
+    "The caller's rating, 1 to 5, or 0 when not rated."
+    myRating: Int!
+    "Everyone's average rating, or null when nobody has rated it."
+    averageRating: Float
+    ratingCount: Int!
     "The latest processing job, for EDITOR."
     job: ProcessingJob
     createdAt: Instant!

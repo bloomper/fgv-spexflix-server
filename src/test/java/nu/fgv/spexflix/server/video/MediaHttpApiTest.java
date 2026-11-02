@@ -92,7 +92,7 @@ class MediaHttpApiTest extends AbstractApiTest {
     private Video video;
 
     private static VideoDto videoDto() {
-        return new VideoDto(uuid(1), "Cleopatra", 2024, VideoKind.FULL_SHOW, "Premiären",
+        return new VideoDto(uuid(1), "Cleopatra", 2024, new VideoKindService.VideoKindDto(uuid(101), "Föreställning", "Show", 1), "Premiären",
                 "2024-02-14", null, null, VideoStatus.READY, null, 7_200_000d, 1920, 1080, true,
                 Instant.parse("2026-10-01T10:00:00Z"), null, "cleopatra.mkv", 4_000_000_000d, true, true, 600d,
                 List.of(), List.of(), List.of(), Instant.parse("2026-09-30T10:00:00Z"), null);

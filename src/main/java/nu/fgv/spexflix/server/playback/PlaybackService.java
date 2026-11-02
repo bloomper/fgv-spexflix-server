@@ -39,12 +39,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Playing videos: signed addresses, progress and the watch list.
+ * Playing videos: signed addresses, progress, the watch list and ratings. Ratings are each user's own, 1 to 5;
+ * every listed video also shows the average of everyone's.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -61,6 +63,7 @@ public class PlaybackService {
     private final VideoRepository videoRepository;
     private final WatchProgressRepository progressRepository;
     private final WatchListEntryRepository watchListRepository;
+    private final VideoRatingRepository ratingRepository;
     private final CallerService callerService;
     private final PlaybackSigner signer;
     private final Duration margin;
@@ -68,12 +71,14 @@ public class PlaybackService {
 
     public PlaybackService(final VideoService videoService, final VideoRepository videoRepository,
                            final WatchProgressRepository progressRepository, final WatchListEntryRepository watchListRepository,
+                           final VideoRatingRepository ratingRepository,
                            final CallerService callerService, final PlaybackSigner signer, final SpexflixProperties properties,
                            final Clock clock) {
         this.videoService = videoService;
         this.videoRepository = videoRepository;
         this.progressRepository = progressRepository;
         this.watchListRepository = watchListRepository;
+        this.ratingRepository = ratingRepository;
         this.callerService = callerService;
         this.signer = signer;
         this.margin = properties.media().linkMargin();
@@ -163,14 +168,78 @@ public class PlaybackService {
     }
 
     /**
-     * The caller's progress and watch list for some videos, for the list fields of {@code Video}.
+     * Rates a video from 1 to 5; 0 removes the caller's rating.
+     */
+    @Transactional
+    public void rate(final UUID videoId, final int rating) {
+        if (rating < 0 || rating > 5) {
+            throw new BadRequestException("error.rating.invalid");
+        }
+
+        final Video video = videoService.visible(videoId);
+        final AppUser user = currentUser();
+        final Optional<VideoRating> existing = ratingRepository.findByUserIdAndVideoId(user.getId(), video.getId());
+
+        if (rating == 0) {
+            existing.ifPresent(ratingRepository::delete);
+            return;
+        }
+
+        final VideoRating entry = existing.orElseGet(() -> {
+            final VideoRating created = new VideoRating();
+
+            created.setUserId(user.getId());
+            created.setVideoId(video.getId());
+            return created;
+        });
+
+        entry.setRating(rating);
+        entry.setRatedAt(clock.instant());
+        ratingRepository.save(entry);
+    }
+
+    /**
+     * The listed videos the caller rated, highest first, then most recently rated.
+     */
+    @Transactional(readOnly = true)
+    public List<VideoDto> highestRated(final int limit) {
+        final AppUser user = currentUser();
+
+        return listedInOrder(ratingRepository.findByUserIdOrderByRatingDescRatedAtDesc(user.getId()).stream()
+                .map(VideoRating::getVideoId).toList()).stream().limit(Math.clamp(limit, 1, 50)).toList();
+    }
+
+    /**
+     * Everyone's average rating and number of ratings for some videos; videos nobody rated are left out.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, RatingSummary> ratingSummaries(final Collection<UUID> videoIds) {
+        if (videoIds.isEmpty()) {
+            return Map.of();
+        }
+
+        final Map<Long, UUID> uuids = videoRepository.findByUuidIn(videoIds).stream()
+                .collect(Collectors.toMap(Video::getId, Video::getUuid));
+        final Map<UUID, RatingSummary> summaries = new HashMap<>();
+
+        if (uuids.isEmpty()) {
+            return summaries;
+        }
+        for (final Object[] row : ratingRepository.summarize(uuids.keySet())) {
+            summaries.put(uuids.get((Long) row[0]), new RatingSummary(((Number) row[1]).doubleValue(), ((Number) row[2]).intValue()));
+        }
+        return summaries;
+    }
+
+    /**
+     * The caller's progress, watch list and ratings for some videos, for the list fields of {@code Video}.
      */
     @Transactional
     public PersonalState personal(final Collection<UUID> videoIds) {
         final Caller caller = callerService.currentIfAny().orElse(null);
 
         if (caller == null || !caller.isUser() || videoIds.isEmpty()) {
-            return new PersonalState(Map.of(), Set.of());
+            return new PersonalState(Map.of(), Set.of(), Map.of());
         }
 
         final AppUser user = callerService.record(caller);
@@ -179,8 +248,11 @@ public class PlaybackService {
         final Map<UUID, WatchProgress> progress = new HashMap<>();
 
         progressRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).forEach(entry -> progress.put(uuids.get(entry.getVideoId()), entry));
+        final Map<UUID, Integer> ratings = new HashMap<>();
+
+        ratingRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).forEach(entry -> ratings.put(uuids.get(entry.getVideoId()), entry.getRating()));
         return new PersonalState(progress, watchListRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).stream()
-                .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()));
+                .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()), ratings);
     }
 
     private List<VideoDto> listedInOrder(final List<Long> ids) {
@@ -205,6 +277,9 @@ public class PlaybackService {
     public record PlaybackSubtitleDto(String language, String label, String url) {
     }
 
-    public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList) {
+    public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList, Map<UUID, Integer> ratings) {
+    }
+
+    public record RatingSummary(double average, int count) {
     }
 }

@@ -80,6 +80,8 @@ class VideoServiceTest {
     @Mock
     private VideoRepository videoRepository;
     @Mock
+    private VideoKindService kindService;
+    @Mock
     private ProcessingJobRepository jobRepository;
     @Mock
     private CallerService callerService;
@@ -98,6 +100,19 @@ class VideoServiceTest {
     private Video ready;
     private Video waiting;
 
+    static VideoKind kind(final long id, final String nameSv, final String nameEn) {
+        final VideoKind kind = new VideoKind();
+
+        kind.setId(id);
+        kind.setUuid(uuid(100 + id));
+        kind.setNameSv(nameSv);
+        kind.setNameEn(nameEn);
+        kind.setPosition((int) id);
+        return kind;
+    }
+
+    private static final VideoKind SHOW = kind(1, "Föreställning", "Show");
+
     private static Video video(final long id, final String title, final VideoStatus status, final boolean published) {
         final Video video = new Video();
 
@@ -105,7 +120,7 @@ class VideoServiceTest {
         video.setUuid(uuid(id));
         video.setTitle(title);
         video.setYear(2024);
-        video.setKind(VideoKind.FULL_SHOW);
+        video.setKind(SHOW);
         video.setStatus(status);
         video.setPublished(published);
         return video;
@@ -119,8 +134,9 @@ class VideoServiceTest {
     void setUp() {
         storage = new MediaStorage(new SpexflixProperties(null, null, null,
                 new SpexflixProperties.Media(root, DataSize.ofGigabytes(1), "https://media.test", "key", null), null, null, null, null));
-        service = new VideoService(videoRepository, jobRepository, callerService, spexService, uploadService, storage, transcoder,
+        service = new VideoService(videoRepository, kindService, jobRepository, callerService, spexService, uploadService, storage, transcoder,
                 auditService, Clock.fixed(NOW, ZoneOffset.UTC));
+        lenient().when(kindService.kindOrDefault(null)).thenReturn(SHOW);
         ready = video(1L, "Cleopatra", VideoStatus.READY, true);
         waiting = video(2L, "Väntar", VideoStatus.UPLOADING, false);
         videos.addAll(List.of(ready, waiting));
@@ -161,8 +177,8 @@ class VideoServiceTest {
         ready.getSpex().setCategoryId(uuid(1));
         when(videoRepository.findListed()).thenReturn(List.of(ready));
 
-        assertThat(service.videos(new VideoFilter(uuid(1), 2024, uuid(7), VideoKind.FULL_SHOW, null))).hasSize(1);
-        assertThat(service.videos(new VideoFilter(null, null, null, VideoKind.TRAILER, null))).isEmpty();
+        assertThat(service.videos(new VideoFilter(uuid(1), 2024, uuid(7), SHOW.getUuid(), null))).hasSize(1);
+        assertThat(service.videos(new VideoFilter(null, null, null, uuid(103), null))).isEmpty();
         assertThat(service.videos(new VideoFilter(uuid(2), null, null, null, null))).isEmpty();
     }
 
@@ -207,15 +223,16 @@ class VideoServiceTest {
         as(TestCallers.editor());
         when(spexService.byId(uuid(7))).thenReturn(CLEOPATRA);
 
-        final VideoDto created = service.create(new VideoInput(uuid(7), null, null, VideoKind.FULL_SHOW, " Premiären ", "2024-02-14", null));
+        final VideoDto created = service.create(new VideoInput(uuid(7), null, null, null, " Premiären ", "2024-02-14", null));
 
         assertThat(created.title()).isEqualTo("Cleopatra");
         assertThat(created.year()).isEqualTo(2024);
+        assertThat(created.kind().nameEn()).isEqualTo("Show");
         assertThat(created.performance()).isEqualTo("Premiären");
         assertThat(created.performanceDate()).isEqualTo(LocalDate.of(2024, 2, 14).toString());
-        assertThatThrownBy(() -> service.create(new VideoInput(uuid(7), null, null, VideoKind.FULL_SHOW, null, "14/2", null)))
+        assertThatThrownBy(() -> service.create(new VideoInput(uuid(7), null, null, null, null, "14/2", null)))
                 .isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.create(new VideoInput(null, " ", null, VideoKind.OTHER, null, null, null)))
+        assertThatThrownBy(() -> service.create(new VideoInput(null, " ", null, null, null, null, null)))
                 .isInstanceOf(BadRequestException.class);
     }
 

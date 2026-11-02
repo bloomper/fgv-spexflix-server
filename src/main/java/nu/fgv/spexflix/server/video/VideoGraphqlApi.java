@@ -81,6 +81,11 @@ public class VideoGraphqlApi {
     }
 
     @QueryMapping
+    public List<VideoDto> highestRated(@Argument final @Nullable Integer limit) {
+        return playbackService.highestRated(limit == null ? 12 : limit);
+    }
+
+    @QueryMapping
     public List<VideoDto> watchList() {
         return playbackService.watchList();
     }
@@ -134,6 +139,37 @@ public class VideoGraphqlApi {
         final Map<VideoDto, Boolean> result = new LinkedHashMap<>();
 
         videos.forEach(video -> result.put(video, state.progress().containsKey(video.id()) && state.progress().get(video.id()).isFinished()));
+        return result;
+    }
+
+    @BatchMapping(typeName = "Video", field = "myRating")
+    public Map<VideoDto, Integer> myRating(final List<VideoDto> videos) {
+        final PlaybackService.PersonalState state = playbackService.personal(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, Integer> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> result.put(video, state.ratings().getOrDefault(video.id(), 0)));
+        return result;
+    }
+
+    @BatchMapping(typeName = "Video", field = "averageRating")
+    public Map<VideoDto, @Nullable Double> averageRating(final List<VideoDto> videos) {
+        final Map<UUID, PlaybackService.RatingSummary> summaries = playbackService.ratingSummaries(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, @Nullable Double> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> {
+            final PlaybackService.RatingSummary summary = summaries.get(video.id());
+
+            result.put(video, summary == null ? null : summary.average());
+        });
+        return result;
+    }
+
+    @BatchMapping(typeName = "Video", field = "ratingCount")
+    public Map<VideoDto, Integer> ratingCount(final List<VideoDto> videos) {
+        final Map<UUID, PlaybackService.RatingSummary> summaries = playbackService.ratingSummaries(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, Integer> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> result.put(video, summaries.containsKey(video.id()) ? summaries.get(video.id()).count() : 0));
         return result;
     }
 
@@ -220,6 +256,12 @@ public class VideoGraphqlApi {
     @MutationMapping
     public @Nullable Void progressSave(@Argument final UUID videoId, @Argument final int positionSeconds) {
         playbackService.saveProgress(videoId, positionSeconds);
+        return null;
+    }
+
+    @MutationMapping
+    public @Nullable Void videoRate(@Argument final UUID videoId, @Argument final int rating) {
+        playbackService.rate(videoId, rating);
         return null;
     }
 

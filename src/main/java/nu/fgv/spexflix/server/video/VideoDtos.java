@@ -36,7 +36,7 @@ public final class VideoDtos {
     public static VideoDto toDto(final Video video) {
         final SpexRef spex = video.getSpex();
 
-        return new VideoDto(video.getUuid(), video.getTitle(), video.getYear(), video.getKind(),
+        return new VideoDto(video.getUuid(), video.getTitle(), video.getYear(), VideoKindService.toDto(video.getKind()),
                 video.getPerformance(), video.getPerformanceDate() == null ? null : video.getPerformanceDate().toString(),
                 video.getDescription(),
                 spex.getId() == null ? null : new VideoSpexDto(spex.getId(), spex.getTitle(), spex.getYear(), spex.getRevival(),
@@ -52,7 +52,7 @@ public final class VideoDtos {
                 video.getCreatedAt(), video.getLastModifiedAt());
     }
 
-    public record VideoDto(UUID id, String title, @Nullable Integer year, VideoKind kind,
+    public record VideoDto(UUID id, String title, @Nullable Integer year, VideoKindService.VideoKindDto kind,
                            @Nullable String performance, @Nullable String performanceDate, @Nullable String description,
                            @Nullable VideoSpexDto spex, VideoStatus status, @Nullable String failure,
                            @Nullable Double durationMs, @Nullable Integer width, @Nullable Integer height,
@@ -81,10 +81,10 @@ public final class VideoDtos {
     }
 
     public record VideoFilter(@Nullable UUID categoryId, @Nullable Integer year, @Nullable UUID spexId,
-                              @Nullable VideoKind kind, @Nullable Boolean includeUnpublished) {
+                              @Nullable UUID kindId, @Nullable Boolean includeUnpublished) {
     }
 
-    public record VideoInput(@Nullable UUID spexId, @Nullable String title, @Nullable Integer year, VideoKind kind,
+    public record VideoInput(@Nullable UUID spexId, @Nullable String title, @Nullable Integer year, @Nullable UUID kindId,
                              @Nullable String performance, @Nullable String performanceDate,
                              @Nullable String description) {
     }

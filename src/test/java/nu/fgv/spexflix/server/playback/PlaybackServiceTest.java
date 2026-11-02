@@ -25,6 +25,7 @@ import nu.fgv.spexflix.server.video.Rendition;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoDtos.VideoDto;
+import nu.fgv.spexflix.server.video.VideoKind;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoService;
 import nu.fgv.spexflix.server.video.VideoStatus;
@@ -49,6 +50,7 @@ import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,6 +75,8 @@ class PlaybackServiceTest {
     @Mock
     private WatchListEntryRepository watchListRepository;
     @Mock
+    private VideoRatingRepository ratingRepository;
+    @Mock
     private CallerService callerService;
     private PlaybackService service;
     private Video video;
@@ -84,12 +88,16 @@ class PlaybackServiceTest {
                 new SpexflixProperties.Media(Path.of("/media"), DataSize.ofGigabytes(1), "https://media.test", "key", Duration.ofHours(4)),
                 null, null, null, null);
 
-        service = new PlaybackService(videoService, videoRepository, progressRepository, watchListRepository, callerService,
+        service = new PlaybackService(videoService, videoRepository, progressRepository, watchListRepository, ratingRepository, callerService,
                 new PlaybackSigner(properties), properties, Clock.fixed(NOW, ZoneOffset.UTC));
         video = new Video();
         video.setId(1L);
         video.setUuid(uuid(1));
         video.setTitle("Cleopatra");
+        video.setKind(new VideoKind());
+        video.getKind().setUuid(uuid(101));
+        video.getKind().setNameSv("Föreställning");
+        video.getKind().setNameEn("Show");
         video.setStatus(VideoStatus.READY);
         video.setPublished(true);
         video.setDurationMs(600_000L);
@@ -183,5 +191,33 @@ class PlaybackServiceTest {
 
         assertThat(service.personal(Set.of(uuid(1))).watchList()).isEmpty();
         verify(progressRepository, never()).findByUserIdAndVideoIdIn(any(), any());
+    }
+
+    @Test
+    void aRatingIsSavedChangedAndRemoved() {
+        final VideoRating existing = new VideoRating();
+
+        when(ratingRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.empty()).thenReturn(Optional.of(existing));
+        service.rate(uuid(1), 4);
+        verify(ratingRepository).save(argThat(rating ->
+                rating.getUserId() == 5L && rating.getVideoId() == 1L && rating.getRating() == 4 && NOW.equals(rating.getRatedAt())));
+
+        service.rate(uuid(1), 0);
+        verify(ratingRepository).delete(existing);
+    }
+
+    @Test
+    void aRatingIsOneToFive() {
+        assertThatThrownBy(() -> service.rate(uuid(1), 6)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.rate(uuid(1), -1)).isInstanceOf(BadRequestException.class);
+        verify(ratingRepository, never()).save(any());
+    }
+
+    @Test
+    void everyonesRatingsAreAveraged() {
+        when(videoRepository.findByUuidIn(List.of(uuid(1)))).thenReturn(List.of(video));
+        when(ratingRepository.summarize(Set.of(1L))).thenReturn(List.<Object[]>of(new Object[]{1L, 3.5d, 2L}));
+
+        assertThat(service.ratingSummaries(List.of(uuid(1)))).containsEntry(uuid(1), new PlaybackService.RatingSummary(3.5, 2));
     }
 }

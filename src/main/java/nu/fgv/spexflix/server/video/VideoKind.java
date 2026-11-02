@@ -13,19 +13,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package nu.fgv.spexflix.server.video;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import nu.fgv.spexflix.server.util.AbstractAuditable;
+import nu.fgv.spexflix.server.util.Uuids;
+
+import java.util.UUID;
+
 /**
- * What a video is.
+ * What a video is, e.g. a full show or a trailer. Admins configure the kinds; the first by
+ * position is the default for new videos.
  *
  * @author Anders Jacobsson
  * @since 1.0
  */
-public enum VideoKind {
-    FULL_SHOW,
-    NUMBER,
-    TRAILER,
-    BEHIND_THE_SCENES,
-    OTHER
+@Entity
+@Table(name = "video_kind")
+@Getter
+@Setter
+public class VideoKind extends AbstractAuditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "uuid", nullable = false, updatable = false, length = 36)
+    private UUID uuid = Uuids.v7();
+
+    @Column(name = "name_sv", nullable = false)
+    private String nameSv;
+
+    @Column(name = "name_en", nullable = false)
+    private String nameEn;
+
+    @Column(name = "position", nullable = false)
+    private int position;
 }
