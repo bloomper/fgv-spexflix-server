@@ -456,7 +456,7 @@ public class SampleDataImporter {
     private void copyFrom(final Long sourceVideoId, final int index) {
         transactionTemplate.executeWithoutResult(_ -> {
             final Video from = videoRepository.findById(sourceVideoId).orElseThrow();
-            final String uuid = UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)).toString();
+            final UUID uuid = UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8));
             final Video to = videoRepository.findAll().stream().filter(video -> video.getUuid().equals(uuid)).findFirst().orElseThrow();
 
             try {
