@@ -120,6 +120,9 @@ Files live in the media folder (``API_MEDIA_ROOT``), never in the database:
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
 Progress (``progressSave``) and the watch list are per user.
 
+Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
+``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.
+
 [[audit]]
 == Audit
 

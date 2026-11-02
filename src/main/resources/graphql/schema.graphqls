@@ -16,6 +16,8 @@ type Query {
     continueWatching(limit: Int = 12): [Video!]!
     "USER. The caller's watch list."
     watchList: [Video!]!
+    "USER. Listed videos the caller rated, highest first."
+    highestRated(limit: Int = 12): [Video!]!
     "USER. The video kinds, in order; the first is the default."
     videoKinds: [VideoKind!]!
     "USER. The categories of the published videos."
@@ -71,6 +73,8 @@ type Mutation {
     subtitleRemove(videoId: ID!, language: String!): Video!
     "USER. Where the caller is in a video; finished when near the end."
     progressSave(videoId: ID!, positionSeconds: Int!): Void
+    "USER. Rates a video from 1 to 5; 0 removes the caller's rating."
+    videoRate(videoId: ID!, rating: Int!): Void
     "USER."
     watchListAdd(videoId: ID!): Void
     "USER."
@@ -222,6 +226,11 @@ type Video {
     "Whether the caller has watched to the end."
     finished: Boolean!
     inWatchList: Boolean!
+    "The caller's rating, 1 to 5, or 0 when not rated."
+    myRating: Int!
+    "Everyone's average rating, or null when nobody has rated it."
+    averageRating: Float
+    ratingCount: Int!
     "The latest processing job, for EDITOR."
     job: ProcessingJob
     createdAt: Instant!

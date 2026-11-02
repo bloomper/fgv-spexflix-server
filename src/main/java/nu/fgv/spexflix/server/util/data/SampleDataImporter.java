@@ -103,7 +103,7 @@ public class SampleDataImporter {
     static final String NO_ACCESS = "no-access@fgv.nu";
     private static final int SPEXREGISTER_ATTEMPTS = 30;
     private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
-    private static final List<String> TABLES = List.of("audit_entry", "watch_list_entry", "watch_progress", "processing_job",
+    private static final List<String> TABLES = List.of("audit_entry", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
             "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
     private static final List<String> CHAPTERS = List.of("Ouvertyr", "Öppningskören", "Kärleksduetten", "Hovets klagan",
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
