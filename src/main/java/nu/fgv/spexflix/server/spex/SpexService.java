@@ -25,7 +25,6 @@ import nu.fgv.spexflix.server.video.SpexRef;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -118,7 +117,6 @@ public class SpexService {
     /**
      * Refreshes the copied spex data of every video, at night.
      */
-    @Scheduled(cron = "0 15 3 * * *", zone = "Europe/Stockholm")
     @SchedulerLock(name = "spex-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void refresh() {

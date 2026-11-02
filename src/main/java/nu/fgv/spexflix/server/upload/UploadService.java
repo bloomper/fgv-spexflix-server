@@ -26,7 +26,6 @@ import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
 import nu.fgv.spexflix.server.util.error.ResourceNotFoundException;
 import org.jspecify.annotations.Nullable;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -192,7 +191,6 @@ public class UploadService {
         }
     }
 
-    @Scheduled(fixedDelay = 60, initialDelay = 5, timeUnit = java.util.concurrent.TimeUnit.MINUTES)
     @SchedulerLock(name = "upload-clean-up", lockAtMostFor = "PT30M")
     @Transactional
     public void cleanUp() {
