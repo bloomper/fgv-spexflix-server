@@ -90,7 +90,10 @@ class CollectionServiceTest {
         video.setTitle("Film " + id);
         video.setKind(kind);
         video.setPerformanceDate(performed);
-        video.getSpex().setId(SPEX);
+        final SpexRef ref = new SpexRef();
+
+        ref.setId(SPEX);
+        video.getSpex().add(ref);
         video.setStatus(VideoStatus.READY);
         video.setPublished(listed);
         lenient().when(videoRepository.findByUuid(video.getUuid())).thenReturn(Optional.of(video));
@@ -104,7 +107,7 @@ class CollectionServiceTest {
         final Video early = video(3, show, LocalDate.of(2024, 3, 1), true);
         final Video unlisted = video(4, show, LocalDate.of(2024, 3, 1), false);
 
-        when(videoRepository.findBySpexIdIn(List.of(SPEX))).thenReturn(List.of(trailerVideo, late, unlisted, early));
+        when(videoRepository.findAboutSpex(List.of(SPEX))).thenReturn(List.of(trailerVideo, late, unlisted, early));
 
         assertThat(service.next(early.getUuid())).satisfies(next -> assertThat(next.id()).isEqualTo(late.getUuid()));
         assertThat(service.next(late.getUuid())).satisfies(next -> assertThat(next.id()).isEqualTo(trailerVideo.getUuid()));

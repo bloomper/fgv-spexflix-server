@@ -194,14 +194,17 @@ class MediaHttpApiTest extends AbstractApiTest {
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk());
 
         when(storage.poster(video)).thenReturn(folder.resolve("missing.jpg"));
-        video.getSpex().setId(uuid(7));
+        final SpexRef spex = new SpexRef();
+
+        spex.setId(uuid(7));
+        video.getSpex().add(spex);
         when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexregisterClient.Poster(JPEG, "image/jpeg")));
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"));
 
         when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.empty());
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isNotFound());
 
-        video.getSpex().setId(null);
+        video.getSpex().clear();
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isNotFound());
     }
 

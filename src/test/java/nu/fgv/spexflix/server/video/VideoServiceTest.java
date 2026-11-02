@@ -126,6 +126,16 @@ class VideoServiceTest {
         return video;
     }
 
+    private static void spex(final Video video, final UUID id, final UUID parentId, final UUID categoryId, final String categoryName) {
+        final SpexRef ref = new SpexRef();
+
+        ref.setId(id);
+        ref.setParentId(parentId);
+        ref.setCategoryId(categoryId);
+        ref.setCategoryName(categoryName);
+        video.getSpex().add(ref);
+    }
+
     private void as(final Caller caller) {
         when(callerService.current()).thenReturn(caller);
     }
@@ -147,6 +157,7 @@ class VideoServiceTest {
             final SpexRef ref = invocation.getArgument(1);
 
             ref.setId(spex.id());
+            ref.setParentId(spex.parentId());
             ref.setTitle(spex.title());
             ref.setYear(spex.year());
             return null;
@@ -173,13 +184,35 @@ class VideoServiceTest {
     @Test
     void videosAreFilteredByCategoryYearSpexAndKind() {
         as(TestCallers.viewer());
-        ready.getSpex().setId(uuid(7));
-        ready.getSpex().setCategoryId(uuid(1));
+        spex(ready, uuid(7), null, uuid(1), null);
         when(videoRepository.findListed()).thenReturn(List.of(ready));
 
         assertThat(service.videos(new VideoFilter(uuid(1), 2024, uuid(7), SHOW.getUuid(), null))).hasSize(1);
         assertThat(service.videos(new VideoFilter(null, null, null, uuid(103), null))).isEmpty();
         assertThat(service.videos(new VideoFilter(uuid(2), null, null, null, null))).isEmpty();
+        assertThat(service.videos(new VideoFilter(null, null, uuid(8), null, null))).isEmpty();
+    }
+
+    @Test
+    void videosOfAnOriginalIncludeThoseOfItsRevivalsAndOfSeveralSpex() {
+        as(TestCallers.viewer());
+
+        final Video revival = video(3L, "Cleopatra 2028", VideoStatus.READY, true);
+        final Video jubilee = video(4L, "Jubileet", VideoStatus.READY, true);
+
+        spex(ready, uuid(7), null, uuid(1), "Chalmersspexet");
+        spex(revival, uuid(70), uuid(7), uuid(1), "Chalmersspexet");
+        spex(jubilee, uuid(8), null, uuid(2), "Bobspexet");
+        spex(jubilee, uuid(70), uuid(7), uuid(1), "Chalmersspexet");
+        when(videoRepository.findListed()).thenReturn(List.of(ready, revival, jubilee));
+
+        assertThat(service.videos(new VideoFilter(null, null, uuid(7), null, null))).extracting(VideoDto::title)
+                .containsExactly("Cleopatra", "Cleopatra 2028", "Jubileet");
+        assertThat(service.videos(new VideoFilter(null, null, uuid(70), null, null))).extracting(VideoDto::title)
+                .containsExactly("Cleopatra 2028", "Jubileet");
+        assertThat(service.videos(new VideoFilter(uuid(2), null, null, null, null))).extracting(VideoDto::title)
+                .as("by the main spex's category").containsExactly("Jubileet");
+        assertThat(VideoDtos.toDto(jubilee).spex()).extracting(VideoDtos.VideoSpexDto::familyId).containsExactly(uuid(8), uuid(7));
     }
 
     @Test
@@ -189,10 +222,8 @@ class VideoServiceTest {
         final Video older = video(3L, "Nobel", VideoStatus.READY, true);
 
         older.setYear(1975);
-        ready.getSpex().setCategoryId(uuid(1));
-        ready.getSpex().setCategoryName("Chalmersspexet");
-        older.getSpex().setCategoryId(uuid(1));
-        older.getSpex().setCategoryName("Chalmersspexet");
+        spex(ready, uuid(7), null, uuid(1), "Chalmersspexet");
+        spex(older, uuid(8), null, uuid(1), "Chalmersspexet");
         when(videoRepository.findListed()).thenReturn(List.of(ready, older));
 
         assertThat(service.categories()).extracting(category -> category.name() + ":" + category.videoCount()).containsExactly("Chalmersspexet:2");
@@ -223,16 +254,16 @@ class VideoServiceTest {
         as(TestCallers.editor());
         when(spexService.byId(uuid(7))).thenReturn(CLEOPATRA);
 
-        final VideoDto created = service.create(new VideoInput(uuid(7), null, null, null, " Premiären ", "2024-02-14", null));
+        final VideoDto created = service.create(new VideoInput(List.of(uuid(7)), null, null, null, " Premiären ", "2024-02-14", null));
 
         assertThat(created.title()).isEqualTo("Cleopatra");
         assertThat(created.year()).isEqualTo(2024);
         assertThat(created.kind().nameEn()).isEqualTo("Show");
         assertThat(created.performance()).isEqualTo("Premiären");
         assertThat(created.performanceDate()).isEqualTo(LocalDate.of(2024, 2, 14).toString());
-        assertThatThrownBy(() -> service.create(new VideoInput(uuid(7), null, null, null, null, "14/2", null)))
+        assertThatThrownBy(() -> service.create(new VideoInput(List.of(uuid(7)), null, null, null, null, "14/2", null)))
                 .isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.create(new VideoInput(null, " ", null, null, null, null, null)))
+        assertThatThrownBy(() -> service.create(new VideoInput(List.of(), " ", null, null, null, null, null)))
                 .isInstanceOf(BadRequestException.class);
     }
 

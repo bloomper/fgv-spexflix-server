@@ -49,6 +49,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -57,6 +58,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * The catalogue of videos: reading them as the caller may see them, and editing them. Files are taken from finished
@@ -71,6 +74,7 @@ public class VideoService {
 
     private static final int MAX_TEXT = 255;
     private static final int MAX_CHAPTERS = 200;
+    private static final int MAX_SPEX = 20;
 
     private final VideoRepository videoRepository;
     private final VideoKindService kindService;
@@ -115,9 +119,9 @@ public class VideoService {
         final boolean all = filter != null && Boolean.TRUE.equals(filter.includeUnpublished()) && caller.isEditor();
 
         return (all ? videoRepository.findNotTrashed() : videoRepository.findListed()).stream()
-                .filter(video -> filter == null || filter.categoryId() == null || filter.categoryId().equals(video.getSpex().getCategoryId()))
+                .filter(video -> filter == null || filter.categoryId() == null || filter.categoryId().equals(categoryId(video)))
                 .filter(video -> filter == null || filter.year() == null || filter.year().equals(video.getYear()))
-                .filter(video -> filter == null || filter.spexId() == null || filter.spexId().equals(video.getSpex().getId()))
+                .filter(video -> filter == null || filter.spexId() == null || video.isAbout(filter.spexId()))
                 .filter(video -> filter == null || filter.kindId() == null || filter.kindId().equals(video.getKind().getUuid()))
                 .map(VideoDtos::toDto)
                 .toList();
@@ -165,10 +169,10 @@ public class VideoService {
         final Map<UUID, Integer> counts = new HashMap<>();
 
         for (final Video video : videoRepository.findListed()) {
-            final UUID categoryId = video.getSpex().getCategoryId();
+            final UUID categoryId = categoryId(video);
 
             if (categoryId != null) {
-                names.put(categoryId, Objects.requireNonNullElse(video.getSpex().getCategoryName(), "?"));
+                names.put(categoryId, Objects.requireNonNullElse(video.mainSpex().getCategoryName(), "?"));
                 counts.merge(categoryId, 1, Integer::sum);
             }
         }
@@ -231,24 +235,40 @@ public class VideoService {
         return VideoDtos.toDto(video);
     }
 
+    private static @Nullable UUID categoryId(final Video video) {
+        return video.mainSpex() == null ? null : video.mainSpex().getCategoryId();
+    }
+
     private void apply(final Video video, final VideoInput input) {
-        if (input.spexId() != null) {
-            if (!Objects.equals(input.spexId(), video.getSpex().getId()) || video.getSpex().getTitle() == null) {
-                final SpexDto spex = spexService.byId(input.spexId());
+        final List<UUID> ids = input.spexIds() == null ? List.of() : input.spexIds().stream().distinct().toList();
+        final Map<UUID, SpexRef> current = video.getSpex().stream()
+                .filter(ref -> ref.getTitle() != null)
+                .collect(Collectors.toMap(SpexRef::getId, Function.identity(), (a, _) -> a));
+        final List<SpexRef> refs = new ArrayList<>();
 
-                spexService.copy(spex, video.getSpex());
-            }
-        } else {
-            video.setSpex(new SpexRef());
+        if (ids.size() > MAX_SPEX) {
+            throw new BadRequestException("error.video.tooManySpex", MAX_SPEX);
         }
+        for (final UUID id : ids) {
+            SpexRef ref = current.get(id);
 
-        final String title = StringUtils.hasText(input.title()) ? input.title().strip() : video.getSpex().getTitle();
+            if (ref == null) {
+                ref = new SpexRef();
+                spexService.copy(spexService.byId(id), ref);
+            }
+            refs.add(ref);
+        }
+        video.getSpex().clear();
+        video.getSpex().addAll(refs);
+
+        final SpexRef main = video.mainSpex();
+        final String title = StringUtils.hasText(input.title()) ? input.title().strip() : main != null ? main.getTitle() : null;
 
         if (title == null) {
             throw new BadRequestException("error.video.titleRequired");
         }
         video.setTitle(limit(title));
-        video.setYear(input.year() != null ? input.year() : video.getSpex().getYear());
+        video.setYear(input.year() != null ? input.year() : main != null ? main.getYear() : null);
         video.setKind(input.kindId() == null && video.getKind() != null ? video.getKind() : kindService.kindOrDefault(input.kindId()));
         video.setPerformance(StringUtils.hasText(input.performance()) ? limit(input.performance().strip()) : null);
         video.setDescription(StringUtils.hasText(input.description()) ? input.description().strip() : null);

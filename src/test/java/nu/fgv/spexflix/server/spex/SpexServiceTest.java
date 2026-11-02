@@ -71,12 +71,13 @@ class SpexServiceTest {
     }
 
     @Test
-    void searchMatchesTitleOrYearNewestFirst() {
+    void searchMatchesTitleOrYearWithRevivalsRightAfterTheirOriginal() {
         when(client.allSpex()).thenReturn(List.of(NOBEL, CLEOPATRA, NOBEL_REVIVAL));
 
-        assertThat(service.search(" NOB ")).containsExactly(NOBEL_REVIVAL, NOBEL);
+        assertThat(service.search(" NOB ")).containsExactly(NOBEL, NOBEL_REVIVAL);
         assertThat(service.search("2024")).containsExactly(CLEOPATRA);
-        assertThat(service.search("")).hasSize(3);
+        assertThat(service.search("")).containsExactly(CLEOPATRA, NOBEL, NOBEL_REVIVAL);
+        assertThat(service.search("2026")).as("a revival brings its original").containsExactly(NOBEL, NOBEL_REVIVAL);
     }
 
     @Test
@@ -105,12 +106,13 @@ class SpexServiceTest {
     }
 
     @Test
-    void aSpexIsCopiedOntoAnAlbumWithTheTimeOfCopying() {
+    void aSpexIsCopiedOntoAVideoWithTheTimeOfCopying() {
         final SpexRef ref = new SpexRef();
 
         service.copy(NOBEL_REVIVAL, ref);
 
         assertThat(ref.getId()).isEqualTo(uuid(2));
+        assertThat(ref.familyId()).isEqualTo(uuid(1));
         assertThat(ref.getTitle()).isEqualTo("Nobel");
         assertThat(ref.getYear()).isEqualTo(2026);
         assertThat(ref.getRevival()).isTrue();
@@ -120,26 +122,30 @@ class SpexServiceTest {
 
     @Test
     void theNightlyRefreshUpdatesEveryVideosCopyOfItsSpex() {
-        final Video album = new Video();
+        final Video video = new Video();
+        final SpexRef nobel = new SpexRef();
+        final SpexRef revival = new SpexRef();
 
-        album.getSpex().setId(uuid(1));
-        album.getSpex().setTitle("Nobel (gammal titel)");
-        when(videoRepository.findSpexIds()).thenReturn(List.of(uuid(1), uuid(99)));
-        when(videoRepository.findBySpexIdIn(List.of(uuid(1), uuid(99)))).thenReturn(List.of(album));
-        when(client.allSpex()).thenReturn(List.of(NOBEL));
+        nobel.setId(uuid(1));
+        nobel.setTitle("Nobel (gammal titel)");
+        revival.setId(uuid(2));
+        video.getSpex().addAll(List.of(nobel, revival));
+        when(videoRepository.findWithSpex()).thenReturn(List.of(video));
+        when(client.allSpex()).thenReturn(List.of(NOBEL, NOBEL_REVIVAL));
 
         service.refresh();
 
-        assertThat(album.getSpex().getTitle()).isEqualTo("Nobel");
+        assertThat(nobel.getTitle()).isEqualTo("Nobel");
+        assertThat(revival.getParentId()).isEqualTo(uuid(1));
     }
 
     @Test
     void theRefreshDoesNothingWithoutVideosAndSurvivesSpexregisterBeingDown() {
-        when(videoRepository.findSpexIds()).thenReturn(List.of());
+        when(videoRepository.findWithSpex()).thenReturn(List.of());
         service.refresh();
         verify(client, never()).allSpex();
 
-        when(videoRepository.findSpexIds()).thenReturn(List.of(uuid(1)));
+        when(videoRepository.findWithSpex()).thenReturn(List.of(new Video()));
         when(client.allSpex()).thenThrow(new SpexregisterClient.SpexregisterCallException("down"));
         service.refresh();
     }

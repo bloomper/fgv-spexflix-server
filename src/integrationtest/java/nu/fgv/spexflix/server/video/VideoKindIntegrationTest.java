@@ -40,7 +40,7 @@ class VideoKindIntegrationTest extends AbstractIntegrationTest {
                 .path("videoKinds[1].isDefault").entity(Boolean.class).isEqualTo(false);
 
         graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\"}) { kind { id } } }")
+                .document("mutation { videoCreate(input: {spexIds: [\"00000000-0000-7000-8000-000000000001\"]}) { kind { id } } }")
                 .execute()
                 .path("videoCreate.kind.id").entity(String.class).isEqualTo(SHOW);
     }

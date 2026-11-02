@@ -32,9 +32,9 @@ type Query {
     search(q: String!): [Video!]!
     "USER. Signed addresses for playing a ready video, valid for its duration plus a margin."
     playback(videoId: ID!): Playback!
-    "EDITOR. Spex in Spexregister matching a title or year."
+    "EDITOR. Spex in Spexregister matching a title or year: each original, then its revivals, newest original first. An original is included when only a revival matches."
     spexSearch(q: String!): [Spex!]!
-    "EDITOR. The published Spexify tracks of the video's spex, for linking chapters; empty when Spexify is unavailable."
+    "EDITOR. The published Spexify tracks of the video's spex and their originals' revivals, for linking chapters; empty when Spexify is unavailable."
     spexifyTracks(videoId: ID!): [SpexifyTrack!]!
     "SPEXIFY or USER. Chapters of published videos linked to the given Spexify tracks."
     chapterLinks(trackIds: [ID!]!): [ChapterLink!]!
@@ -157,8 +157,10 @@ enum VideoStatus {
 }
 
 input VideoFilter {
+    "The main spex's category."
     categoryId: ID
     year: Int
+    "Videos about the spex or, when it is an original, one of its revivals."
     spexId: ID
     kindId: ID
     "EDITOR only."
@@ -166,10 +168,11 @@ input VideoFilter {
 }
 
 input VideoInput {
-    "A spex in Spexregister; without it the video is not about one spex."
-    spexId: ID
-    "Defaults to the spex title and year."
+    "Spex in Spexregister, the main one first, e.g. several for a jubilee show. Empty when the video is not about any spex."
+    spexIds: [ID!]! = []
+    "Defaults to the main spex's title; required without a spex."
     title: String
+    "Defaults to the main spex's year."
     year: Int
     "A video kind; defaults to the first one for a new video and to the current one for an existing video."
     kindId: ID
@@ -199,6 +202,8 @@ type Spex {
     title: String
     year: Int
     revival: Boolean!
+    "The original, for a revival."
+    parentId: ID
     categoryName: String
 }
 
@@ -207,6 +212,10 @@ type VideoSpex {
     title: String
     year: Int
     revival: Boolean
+    "The original, for a revival; null until the nightly refresh for spex linked before Spexflix kept it."
+    parentId: ID
+    "The original spex: the parent of a revival, else the spex itself. Revivals share it with their original."
+    familyId: ID!
     categoryId: ID
     categoryName: String
 }
@@ -219,7 +228,8 @@ type Video {
     performance: String
     performanceDate: String
     description: String
-    spex: VideoSpex
+    "The spex the video is about, the main one first; empty when it is not about any spex. The poster falls back to the main spex's."
+    spex: [VideoSpex!]!
     status: VideoStatus!
     "Why processing failed."
     failure: String
@@ -249,7 +259,7 @@ type Video {
     ratingCount: Int!
     "The collections the video is in, by title."
     collections: [CollectionRef!]!
-    "What plays after this video: the next in its first collection that has one, else the next of the same spex by kind and performance date. Ask for one video at a time."
+    "What plays after this video: the next in its first collection that has one, else the next of the same main spex (revivals counting as their original) by kind and performance date. Ask for one video at a time."
     next: Video
     "The latest processing job, for EDITOR."
     job: ProcessingJob

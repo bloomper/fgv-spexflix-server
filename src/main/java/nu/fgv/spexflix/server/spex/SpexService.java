@@ -30,18 +30,23 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * Picking a spex for a video, posters, and the daily refresh of the spex titles, years and categories copied onto
- * videos.
+ * Picking the spex of a video, posters, and the daily refresh of the spex titles, years, originals and categories
+ * copied onto videos.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -66,7 +71,8 @@ public class SpexService {
     }
 
     /**
-     * Spex whose title or year matches, for editors picking the spex of a video.
+     * Spex whose title or year matches, for editors picking the spex of a video. Revivals come right after their
+     * original, which is included even when only a revival matches, so that they can be shown together.
      */
     public List<SpexDto> search(final String query) {
         callerService.current().requireEditor();
@@ -74,16 +80,49 @@ public class SpexService {
         final String q = query.strip().toLowerCase(Locale.ROOT);
 
         try {
-            return client.allSpex().stream()
-                    .filter(spex -> q.isEmpty()
-                            || (spex.title() != null && spex.title().toLowerCase(Locale.ROOT).contains(q))
-                            || (spex.year() != null && spex.year().toString().equals(q)))
-                    .sorted(Comparator.comparing((SpexDto spex) -> spex.year() == null ? 0 : spex.year()).reversed())
-                    .limit(MAX_RESULTS)
-                    .toList();
+            return group(client.allSpex(), spex -> q.isEmpty()
+                    || (spex.title() != null && spex.title().toLowerCase(Locale.ROOT).contains(q))
+                    || (spex.year() != null && spex.year().toString().equals(q)), MAX_RESULTS);
         } catch (final SpexregisterClient.SpexregisterCallException e) {
             throw new SpexregisterUnavailableException(e);
         }
+    }
+
+    /**
+     * The matching spex grouped by original, newest original first: each original, then its matching revivals by
+     * year. At most {@code limit} spex, but never splitting a group.
+     */
+    static List<SpexDto> group(final List<SpexDto> all, final Predicate<SpexDto> matches, final int limit) {
+        final Map<UUID, SpexDto> byId = all.stream().collect(Collectors.toMap(SpexDto::id, Function.identity(), (a, _) -> a));
+        final Map<UUID, List<SpexDto>> revivals = new LinkedHashMap<>();
+        final Set<UUID> originals = new LinkedHashSet<>();
+
+        for (final SpexDto spex : all) {
+            if (!matches.test(spex)) {
+                continue;
+            }
+            if (spex.parentId() != null && byId.containsKey(spex.parentId())) {
+                originals.add(spex.parentId());
+                revivals.computeIfAbsent(spex.parentId(), _ -> new ArrayList<>()).add(spex);
+            } else {
+                originals.add(spex.id());
+            }
+        }
+
+        final Comparator<SpexDto> byYear = Comparator.comparing((SpexDto spex) -> spex.year() == null ? 0 : spex.year());
+        final List<SpexDto> result = new ArrayList<>();
+
+        for (final SpexDto original : originals.stream().map(byId::get).sorted(byYear.reversed()).toList()) {
+            final List<SpexDto> group = new ArrayList<>();
+
+            group.add(original);
+            revivals.getOrDefault(original.id(), List.of()).stream().sorted(byYear).forEach(group::add);
+            if (!result.isEmpty() && result.size() + group.size() > limit) {
+                break;
+            }
+            result.addAll(group);
+        }
+        return result;
     }
 
     public SpexDto byId(final UUID id) {
@@ -106,6 +145,7 @@ public class SpexService {
 
     public void copy(final SpexDto spex, final SpexRef ref) {
         ref.setId(spex.id());
+        ref.setParentId(spex.parentId());
         ref.setTitle(spex.title());
         ref.setYear(spex.year());
         ref.setRevival(spex.revival());
@@ -120,21 +160,23 @@ public class SpexService {
     @SchedulerLock(name = "spex-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     @Transactional
     public void refresh() {
-        final List<UUID> ids = videoRepository.findSpexIds();
+        final List<Video> videos = videoRepository.findWithSpex();
 
-        if (ids.isEmpty()) {
+        if (videos.isEmpty()) {
             return;
         }
         try {
             final Map<UUID, SpexDto> spex = client.allSpex().stream().collect(Collectors.toMap(SpexDto::id, Function.identity(), (a, _) -> a));
 
-            for (final Video video : videoRepository.findBySpexIdIn(ids)) {
-                final SpexDto current = spex.get(video.getSpex().getId());
+            for (final Video video : videos) {
+                for (final SpexRef ref : video.getSpex()) {
+                    final SpexDto current = spex.get(ref.getId());
 
-                if (current != null) {
-                    copy(current, video.getSpex());
-                } else if (StringUtils.hasText(video.getSpex().getTitle())) {
-                    log.warn("Spex {} of video {} is no longer in Spexregister", video.getSpex().getId(), video.getId());
+                    if (current != null) {
+                        copy(current, ref);
+                    } else if (StringUtils.hasText(ref.getTitle())) {
+                        log.warn("Spex {} of video {} is no longer in Spexregister", ref.getId(), video.getId());
+                    }
                 }
             }
         } catch (final SpexregisterClient.SpexregisterCallException e) {

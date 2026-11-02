@@ -39,6 +39,7 @@ import nu.fgv.spexflix.server.user.AppUser;
 import nu.fgv.spexflix.server.user.AppUserRepository;
 import nu.fgv.spexflix.server.util.security.SecurityUtil;
 import nu.fgv.spexflix.server.video.Chapter;
+import nu.fgv.spexflix.server.video.SpexRef;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoKind;
@@ -106,7 +107,7 @@ public class SampleDataImporter {
     static final String NO_ACCESS = "no-access@fgv.nu";
     private static final int SPEXREGISTER_ATTEMPTS = 30;
     private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
-    private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job",
+    private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
             "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
     private static final List<String> CHAPTERS = List.of("Ouvertyr", "Öppningskören", "Kärleksduetten", "Hovets klagan",
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
@@ -412,7 +413,10 @@ public class SampleDataImporter {
         final boolean show = kind == kinds.getFirst();
 
         video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)));
-        spexService.copy(picked, video.getSpex());
+        final SpexRef ref = new SpexRef();
+
+        spexService.copy(picked, ref);
+        video.getSpex().add(ref);
         video.setKind(kind);
         video.setTitle(show ? String.valueOf(picked.title()) : picked.title() + " – " + kind.getNameSv().toLowerCase(java.util.Locale.ROOT));
         video.setYear(picked.year());
@@ -461,7 +465,7 @@ public class SampleDataImporter {
     }
 
     private void addChapters(final Video video, final UUID spexId) {
-        final List<SpexifyClient.Track> tracks = spexifyClient.tracks(spexId);
+        final List<SpexifyClient.Track> tracks = spexifyClient.tracks(List.of(spexId));
 
         for (int i = 0; i < 5; i++) {
             final Chapter chapter = new Chapter();
@@ -542,8 +546,8 @@ public class SampleDataImporter {
      */
     private void createCollection() {
         videoRepository.findAll().stream()
-                .filter(video -> !video.isTrashed() && video.getSpex().getId() != null)
-                .collect(Collectors.groupingBy(video -> video.getSpex().getId()))
+                .filter(video -> !video.isTrashed() && video.mainSpex() != null)
+                .collect(Collectors.groupingBy(video -> video.mainSpex().familyId()))
                 .values().stream()
                 .filter(videos -> videos.size() > 1)
                 .max(Comparator.comparingInt(List::size))
@@ -551,7 +555,7 @@ public class SampleDataImporter {
                     final VideoCollection collection = new VideoCollection();
                     final Video first = videos.getFirst();
 
-                    collection.setTitle(Objects.requireNonNullElse(first.getSpex().getTitle(), first.getTitle()) + " genom åren");
+                    collection.setTitle(Objects.requireNonNullElse(first.mainSpex().getTitle(), first.getTitle()) + " genom åren");
                     collection.setDescription("Alla filmer från spexet, i tur och ordning.");
                     collection.getVideos().addAll(videos.stream()
                             .sorted(Comparator.comparing(Video::getYear, Comparator.nullsLast(Comparator.<Integer>naturalOrder())).thenComparing(Video::getId))

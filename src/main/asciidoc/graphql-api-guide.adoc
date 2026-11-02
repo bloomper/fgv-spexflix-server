@@ -87,7 +87,9 @@ Every service method resolves the caller and checks the role before it acts; Gra
 [[videos]]
 == Videos and processing
 
-A video belongs to a spex in Spexregister and starts unpublished, waiting for its file.
+A video is usually about one spex in Spexregister, but can be about several, e.g. a jubilee show, or none (``Video.spex`` is a list, the main spex first: the poster, the default title and year, and the category come from it).
+A revival is a spex of its own in Spexregister; each linked spex keeps its original (``VideoSpex.familyId``), so filtering on an original (``VideoFilter.spexId``) also gives the videos of its revivals, and ``spexSearch`` lists revivals right after their original.
+A video starts unpublished, waiting for its file.
 Its file is uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``videoSetFile``, which queues it.
 
 Every video has a kind (``videoKinds``), e.g. a full show or a trailer, with a Swedish and an English name.
@@ -124,7 +126,7 @@ Progress (``progressSave``) and the watch list are per user.
 Collections (``collections``, ``collection``) hold videos in an order of their own; a video can be in several.
 Listeners see a collection's listed videos only, and only collections with one.
 Editors create and change collections (``collectionCreate``, ``collectionUpdate``); only admins delete them, and their videos stay.
-``Video.next`` is what plays after a video: the next listed video in its first collection, by title, that has one after it, else the next listed video of the same spex by kind and performance date.
+``Video.next`` is what plays after a video: the next listed video in its first collection, by title, that has one after it, else the next listed video of the same main spex, revivals counting as their original, by kind and performance date.
 
 Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 ``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.

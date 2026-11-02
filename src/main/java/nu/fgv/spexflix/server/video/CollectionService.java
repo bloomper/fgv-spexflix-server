@@ -171,13 +171,13 @@ public class CollectionService {
             }
         }
 
-        final UUID spexId = current.getSpex().getId();
+        final SpexRef main = current.mainSpex();
 
-        if (spexId == null) {
+        if (main == null) {
             return null;
         }
 
-        final List<Video> siblings = videoRepository.findBySpexIdIn(List.of(spexId)).stream()
+        final List<Video> siblings = videoRepository.findAboutSpex(List.of(main.familyId())).stream()
                 .filter(video -> video.isListed() || video.getId().equals(current.getId()))
                 .sorted(SPEX_ORDER)
                 .toList();

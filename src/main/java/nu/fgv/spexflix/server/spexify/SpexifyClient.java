@@ -52,8 +52,8 @@ public class SpexifyClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(3);
     private static final String TRACKS = """
-            query SpexTracks($spexId: ID!) {
-                spexTracks(spexId: $spexId) { id title discNumber trackNumber albumTitle }
+            query SpexTracks($spexIds: [ID!]!) {
+                spexTracks(spexIds: $spexIds) { id title discNumber trackNumber albumTitle }
             }""";
 
     private final @Nullable HttpSyncGraphQlClient graphQlClient;
@@ -77,12 +77,12 @@ public class SpexifyClient {
     }
 
     @Cacheable(cacheNames = CacheConfig.SPEXIFY_TRACKS)
-    public List<Track> tracks(final UUID spexId) {
+    public List<Track> tracks(final List<UUID> spexIds) {
         if (graphQlClient == null) {
             return List.of();
         }
         try {
-            final ClientGraphQlResponse response = graphQlClient.document(TRACKS).variable("spexId", spexId).executeSync();
+            final ClientGraphQlResponse response = graphQlClient.document(TRACKS).variable("spexIds", spexIds).executeSync();
 
             if (!response.getErrors().isEmpty() || !response.isValid()) {
                 log.debug("Spexify answered with errors: {}", response.getErrors());
