@@ -42,6 +42,7 @@ import nu.fgv.spexflix.server.video.Chapter;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoKind;
+import nu.fgv.spexflix.server.video.VideoKindRepository;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoStatus;
 import org.keycloak.admin.client.Keycloak;
@@ -75,6 +76,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -102,7 +104,7 @@ public class SampleDataImporter {
     private static final int SPEXREGISTER_ATTEMPTS = 30;
     private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
     private static final List<String> TABLES = List.of("audit_entry", "watch_list_entry", "watch_progress", "processing_job",
-            "chapter", "subtitle", "rendition", "video", "upload_session", "app_user");
+            "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
     private static final List<String> CHAPTERS = List.of("Ouvertyr", "Öppningskören", "Kärleksduetten", "Hovets klagan",
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
     private static final String SUBTITLES_SV = """
@@ -136,6 +138,7 @@ public class SampleDataImporter {
     private final Ffmpeg ffmpeg;
     private final ProcessingWorker worker;
     private final VideoRepository videoRepository;
+    private final VideoKindRepository videoKindRepository;
     private final ProcessingJobRepository jobRepository;
     private final AppUserRepository userRepository;
     private final WatchProgressRepository progressRepository;
@@ -148,7 +151,8 @@ public class SampleDataImporter {
                               final TransactionTemplate transactionTemplate, final SpexregisterClient spexregisterClient,
                               final SpexService spexService, final SpexifyClient spexifyClient, final Keycloak keycloak,
                               final MediaStorage storage, final Ffmpeg ffmpeg, final ProcessingWorker worker,
-                              final VideoRepository videoRepository, final ProcessingJobRepository jobRepository,
+                              final VideoRepository videoRepository, final VideoKindRepository videoKindRepository,
+                              final ProcessingJobRepository jobRepository,
                               final AppUserRepository userRepository, final WatchProgressRepository progressRepository,
                               final WatchListEntryRepository watchListRepository, final AuditEntryRepository auditRepository,
                               final Clock clock) {
@@ -164,6 +168,7 @@ public class SampleDataImporter {
         this.ffmpeg = ffmpeg;
         this.worker = worker;
         this.videoRepository = videoRepository;
+        this.videoKindRepository = videoKindRepository;
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
         this.progressRepository = progressRepository;
@@ -187,14 +192,26 @@ public class SampleDataImporter {
         video.getSubtitles().add(subtitle);
     }
 
-    private static String label(final VideoKind kind) {
-        return switch (kind) {
-            case FULL_SHOW -> "föreställning";
-            case NUMBER -> "nummer";
-            case TRAILER -> "trailer";
-            case BEHIND_THE_SCENES -> "bakom kulisserna";
-            case OTHER -> "övrigt";
-        };
+    /**
+     * The kinds a new database starts with, as in the migration: show (the default), number, trailer, behind the
+     * scenes and other.
+     */
+    private List<VideoKind> createKinds() {
+        final String[][] names = {{"Föreställning", "Show"}, {"Nummer", "Number"}, {"Trailer", "Trailer"},
+                {"Bakom kulisserna", "Behind the scenes"}, {"Övrigt", "Other"}};
+        final List<VideoKind> kinds = new ArrayList<>();
+
+        for (int i = 0; i < names.length; i++) {
+            final VideoKind kind = new VideoKind();
+
+            kind.setUuid(UUID.fromString("00000000-0000-7000-8000-00000000b00" + (i + 1)));
+            kind.setNameSv(names[i][0]);
+            kind.setNameEn(names[i][1]);
+            kind.setPosition(i + 1);
+            kind.setCreatedBy("system");
+            kinds.add(videoKindRepository.save(kind));
+        }
+        return kinds;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -240,12 +257,13 @@ public class SampleDataImporter {
             final int count = large ? 300 : 15;
             final Map<String, Long> processedBy = new HashMap<>();
             final List<Long> jobs = new ArrayList<>();
+            final List<VideoKind> kinds = Objects.requireNonNull(transactionTemplate.execute(_ -> createKinds()));
 
             for (int i = 0; i < count; i++) {
                 final int index = i;
                 final SampleVideos.Source source = sources.get(index == 13 ? 4 : index % 4);
                 final boolean copyProcessed = preprocessed && processedBy.containsKey(source.key());
-                final Long jobId = transactionTemplate.execute(_ -> createVideo(index, spex, source, !copyProcessed));
+                final Long jobId = transactionTemplate.execute(_ -> createVideo(index, spex, kinds, source, !copyProcessed));
 
                 if (copyProcessed) {
                     copyFrom(processedBy.get(source.key()), index);
@@ -380,18 +398,20 @@ public class SampleDataImporter {
      *
      * @return the job's id, or null when the video copies another's processed files
      */
-    private Long createVideo(final int index, final List<SpexDto> spex, final SampleVideos.Source source, final boolean queue) {
+    private Long createVideo(final int index, final List<SpexDto> spex, final List<VideoKind> kinds,
+                             final SampleVideos.Source source, final boolean queue) {
         final SpexDto picked = spex.get(index % spex.size());
         final Video video = new Video();
-        final VideoKind kind = index < spex.size() ? VideoKind.FULL_SHOW : VideoKind.values()[index % VideoKind.values().length];
+        final VideoKind kind = kinds.get(index < spex.size() ? 0 : index % kinds.size());
+        final boolean show = kind == kinds.getFirst();
 
         video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)));
         spexService.copy(picked, video.getSpex());
         video.setKind(kind);
-        video.setTitle(kind == VideoKind.FULL_SHOW ? String.valueOf(picked.title()) : picked.title() + " – " + label(kind));
+        video.setTitle(show ? String.valueOf(picked.title()) : picked.title() + " – " + kind.getNameSv().toLowerCase(java.util.Locale.ROOT));
         video.setYear(picked.year());
-        video.setPerformance(kind == VideoKind.FULL_SHOW ? "Premiären" : null);
-        video.setPerformanceDate(kind == VideoKind.FULL_SHOW && picked.year() != null ? LocalDate.of(picked.year(), 2, 14) : null);
+        video.setPerformance(show ? "Premiären" : null);
+        video.setPerformanceDate(show && picked.year() != null ? LocalDate.of(picked.year(), 2, 14) : null);
         video.setDescription("Exempeldata: en genererad testbild med ton (" + source.key() + ").");
         video.setPublished(index != 3 && index != 5);
         video.setPublishedAt(video.isPublished() ? clock.instant().minus(Duration.ofDays(index)) : null);
@@ -400,7 +420,7 @@ public class SampleDataImporter {
         video.setOriginalExtension(MediaStorage.extensionOf(source.file().getFileName().toString()));
         video.setStatus(VideoStatus.PROCESSING);
         video.setCreatedBy("system");
-        if (kind == VideoKind.FULL_SHOW) {
+        if (show) {
             addChapters(video, picked.id());
         }
         if (index % 3 == 0) {

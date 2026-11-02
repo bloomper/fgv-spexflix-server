@@ -145,7 +145,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void onlyReadyVideosArePlayedOrPublished() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: TRAILER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b003\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 
@@ -174,7 +174,7 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     @Test
     void viewersCannotSeeUnpublishedVideos() {
         final String videoId = graphQl(EDITOR)
-                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kind: NUMBER}) { id } }")
+                .document("mutation { videoCreate(input: {spexId: \"00000000-0000-7000-8000-000000000001\", kindId: \"00000000-0000-7000-8000-00000000b002\"}) { id } }")
                 .execute()
                 .path("videoCreate.id").entity(String.class).get();
 

@@ -90,6 +90,9 @@ Every service method resolves the caller and checks the role before it acts; Gra
 A video belongs to a spex in Spexregister and starts unpublished, waiting for its file.
 Its file is uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``videoSetFile``, which queues it.
 
+Every video has a kind (``videoKinds``), e.g. a full show or a trailer, with a Swedish and an English name.
+Admins add, rename, reorder and delete kinds; the first is the default for new videos, and a kind that any video uses, trashed ones included, cannot be deleted.
+
 A worker, the same application with ``API_WORKER_ENABLED=true``, processes one job at a time, kept in the database so it survives restarts; a job whose lease runs out starts over.
 ffprobe reads the original; ffmpeg makes 1080p, 720p and 480p (never above the original), H.264 and AAC, 6-second segments with aligned keyframes, deinterlacing and loudness normalisation.
 An H.264/AAC original of at most 1080p is copied into the top rendition instead.

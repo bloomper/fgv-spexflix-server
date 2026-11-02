@@ -25,6 +25,7 @@ import nu.fgv.spexflix.server.video.Rendition;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoDtos.VideoDto;
+import nu.fgv.spexflix.server.video.VideoKind;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoService;
 import nu.fgv.spexflix.server.video.VideoStatus;
@@ -90,6 +91,10 @@ class PlaybackServiceTest {
         video.setId(1L);
         video.setUuid(uuid(1));
         video.setTitle("Cleopatra");
+        video.setKind(new VideoKind());
+        video.getKind().setUuid(uuid(101));
+        video.getKind().setNameSv("Föreställning");
+        video.getKind().setNameEn("Show");
         video.setStatus(VideoStatus.READY);
         video.setPublished(true);
         video.setDurationMs(600_000L);
