@@ -114,6 +114,67 @@ class VideoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewersLikeVideosAndSeeTheTopLists() throws Exception {
+        final String videoId = readyVideo(folder, true);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { videoLike(videoId: $id, liked: true) videoRate(videoId: $id, rating: 5) }")
+                .variable("id", videoId).execute().errors().verify();
+        graphQl(EDITOR).document("mutation($id: ID!) { videoLike(videoId: $id, liked: true) }").variable("id", videoId).execute().errors().verify();
+
+        graphQl(VIEWER)
+                .document("""
+                        query($id: ID!) {
+                          video(id: $id) { liked likeCount }
+                          likedVideos { id }
+                          rated: topVideos(by: RATED) { id }
+                          liked: topVideos(by: LIKED) { id }
+                          sorted: videos(filter: {sort: LIKES, liked: true}) { id }
+                        }""")
+                .variable("id", videoId)
+                .execute()
+                .path("video.liked").entity(Boolean.class).isEqualTo(true)
+                .path("video.likeCount").entity(Integer.class).isEqualTo(2)
+                .path("likedVideos[0].id").entity(String.class).isEqualTo(videoId)
+                .path("rated[0].id").entity(String.class).isEqualTo(videoId)
+                .path("liked[0].id").entity(String.class).isEqualTo(videoId)
+                .path("sorted[0].id").entity(String.class).isEqualTo(videoId);
+
+        graphQl(VIEWER).document("mutation($id: ID!) { videoLike(videoId: $id, liked: false) }").variable("id", videoId).execute().errors().verify();
+        graphQl(VIEWER).document("query($id: ID!) { video(id: $id) { liked likeCount } likedVideos { id } }").variable("id", videoId).execute()
+                .path("video.liked").entity(Boolean.class).isEqualTo(false)
+                .path("video.likeCount").entity(Integer.class).isEqualTo(1)
+                .path("likedVideos").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
+    void viewersKeepPlaylistsOfVideosAndClips() throws Exception {
+        final String videoId = readyVideo(folder, true);
+
+        graphQl(EDITOR).document("mutation($id: ID!) { chaptersSet(videoId: $id, chapters: [{startSeconds: 0, title: \"Ouvertyr\"}, {startSeconds: 2, title: \"Final\"}]) { id } }")
+                .variable("id", videoId).execute().errors().verify();
+
+        final String playlistId = graphQl(VIEWER).document("mutation { playlistCreate(input: {name: \"Mina favoriter\", isPublic: true}) { id owned } }")
+                .execute().path("playlistCreate.id").entity(String.class).get();
+
+        graphQl(VIEWER).document("mutation($p: ID!, $v: ID!) { a: playlistAddItem(playlistId: $p, videoId: $v) { id } b: playlistAddItem(playlistId: $p, videoId: $v, startSeconds: 2) { id } }")
+                .variable("p", playlistId).variable("v", videoId).execute().errors().verify();
+        graphQl(VIEWER).document("query($p: ID!) { playlist(id: $p) { name itemCount items { title startSeconds video { id liked } } } }")
+                .variable("p", playlistId).execute()
+                .path("playlist.itemCount").entity(Integer.class).isEqualTo(2)
+                .path("playlist.items[0].startSeconds").valueIsNull()
+                .path("playlist.items[1].title").entity(String.class).isEqualTo("Final")
+                .path("playlist.items[1].video.id").entity(String.class).isEqualTo(videoId);
+
+        // Others can play a public playlist but not change it
+        graphQl(EDITOR).document("{ playlists { name owned ownerName } }").execute()
+                .path("playlists[0].owned").entity(Boolean.class).isEqualTo(false);
+        expectError(graphQl(EDITOR).document("mutation($p: ID!) { playlistDelete(id: $p) }").variable("p", playlistId).execute(), "NOT_FOUND");
+
+        graphQl(VIEWER).document("mutation($p: ID!) { playlistDelete(id: $p) }").variable("p", playlistId).execute().errors().verify();
+        graphQl(VIEWER).document("{ playlists { id } }").execute().path("playlists").entityList(Object.class).hasSize(0);
+    }
+
+    @Test
     void viewersKeepTheirPlaceAndAWatchList() throws Exception {
         final String videoId = readyVideo(folder, true);
 

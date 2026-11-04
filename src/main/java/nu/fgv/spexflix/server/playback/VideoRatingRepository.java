@@ -42,4 +42,10 @@ public interface VideoRatingRepository extends JpaRepository<VideoRating, Long> 
      */
     @Query("SELECT r.videoId, AVG(r.rating), COUNT(r) FROM VideoRating r WHERE r.videoId IN :videoIds GROUP BY r.videoId")
     List<Object[]> summarize(@Param("videoIds") Collection<Long> videoIds);
+
+    /**
+     * The sum and number of ratings of every rated video, as rows of video id, sum and count.
+     */
+    @Query("SELECT r.videoId, SUM(r.rating), COUNT(r) FROM VideoRating r GROUP BY r.videoId")
+    List<Object[]> totals();
 }
