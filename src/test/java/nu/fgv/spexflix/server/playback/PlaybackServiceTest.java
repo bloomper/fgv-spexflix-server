@@ -25,6 +25,7 @@ import nu.fgv.spexflix.server.video.Rendition;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoDtos.VideoDto;
+import nu.fgv.spexflix.server.video.VideoDtos;
 import nu.fgv.spexflix.server.video.VideoKind;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoService;
@@ -77,6 +78,8 @@ class PlaybackServiceTest {
     @Mock
     private VideoRatingRepository ratingRepository;
     @Mock
+    private VideoLikeRepository likeRepository;
+    @Mock
     private CallerService callerService;
     private PlaybackService service;
     private Video video;
@@ -88,7 +91,7 @@ class PlaybackServiceTest {
                 new SpexflixProperties.Media(Path.of("/media"), DataSize.ofGigabytes(1), "https://media.test", "key", Duration.ofHours(4)),
                 null, null, null, null);
 
-        service = new PlaybackService(videoService, videoRepository, progressRepository, watchListRepository, ratingRepository, callerService,
+        service = new PlaybackService(videoService, videoRepository, progressRepository, watchListRepository, ratingRepository, likeRepository, callerService,
                 new PlaybackSigner(properties), properties, Clock.fixed(NOW, ZoneOffset.UTC));
         video = new Video();
         video.setId(1L);
@@ -219,6 +222,69 @@ class PlaybackServiceTest {
         when(ratingRepository.summarize(Set.of(1L))).thenReturn(List.<Object[]>of(new Object[]{1L, 3.5d, 2L}));
 
         assertThat(service.ratingSummaries(List.of(uuid(1)))).containsEntry(uuid(1), new PlaybackService.RatingSummary(3.5, 2));
+    }
+
+    @Test
+    void aLikeIsSavedOnceAndTakenBack() {
+        final VideoLike existing = new VideoLike();
+
+        when(likeRepository.findByUserIdAndVideoId(5L, 1L)).thenReturn(Optional.empty()).thenReturn(Optional.of(existing));
+        when(videoRepository.findByUuid(uuid(1))).thenReturn(Optional.of(video));
+        service.like(uuid(1), true);
+        verify(likeRepository).save(argThat(like -> like.getUserId() == 5L && like.getVideoId() == 1L && NOW.equals(like.getLikedAt())));
+
+        service.like(uuid(1), false);
+        verify(likeRepository).delete(existing);
+    }
+
+    @Test
+    void theWeightedAverageDrawsFewRatingsTowardsTheMean() {
+        // The mean of all 13 ratings is about 3.9: a single 5 comes out near 4.3, ten 4s near 4.0, two 3s near 3.5
+        final java.util.Map<Long, Double> scores = PlaybackService.weighted(List.<Object[]>of(
+                new Object[]{1L, 5L, 1L}, new Object[]{2L, 40L, 10L}, new Object[]{3L, 6L, 2L}));
+
+        assertThat(scores.get(1L)).isLessThan(4.5).isGreaterThan(scores.get(2L));
+        assertThat(scores.get(2L)).isGreaterThan(scores.get(3L));
+    }
+
+    @Test
+    void theTopListLeavesOutVideosNobodyRated() {
+        final Video other = new Video();
+
+        other.setId(2L);
+        other.setUuid(uuid(2));
+        other.setTitle("Napoleon");
+        other.setKind(video.getKind());
+        other.setStatus(VideoStatus.READY);
+        when(videoService.videos(any())).thenReturn(List.of(VideoDtos.toDto(other), VideoDtos.toDto(video)));
+        when(videoRepository.findByUuidIn(any())).thenReturn(List.of(video, other));
+        when(ratingRepository.totals()).thenReturn(List.<Object[]>of(new Object[]{1L, 9L, 2L}));
+
+        assertThat(service.top(PlaybackService.TopBy.RATED, null, 10)).extracting(VideoDtos.VideoDto::title).containsExactly("Cleopatra");
+    }
+
+    @Test
+    void browsingSortsByLikesAndKeepsOnlyLikedOnes() {
+        final Video other = new Video();
+
+        other.setId(2L);
+        other.setUuid(uuid(2));
+        other.setTitle("Napoleon");
+        other.setKind(video.getKind());
+        other.setStatus(VideoStatus.READY);
+        when(videoService.videos(any())).thenReturn(List.of(VideoDtos.toDto(video), VideoDtos.toDto(other)));
+        when(videoRepository.findByUuidIn(any())).thenReturn(List.of(video, other));
+        when(likeRepository.countAll()).thenReturn(List.<Object[]>of(new Object[]{2L, 3L}, new Object[]{1L, 1L}));
+
+        assertThat(service.browse(new VideoDtos.VideoFilter(null, null, null, null, null, null, null, null, null, VideoDtos.VideoSort.LIKES)))
+                .extracting(VideoDtos.VideoDto::title).containsExactly("Napoleon", "Cleopatra");
+
+        final VideoLike liked = new VideoLike();
+
+        liked.setVideoId(1L);
+        when(likeRepository.findByUserIdAndVideoIdIn(any(), any())).thenReturn(List.of(liked));
+        assertThat(service.browse(new VideoDtos.VideoFilter(null, null, null, null, null, null, null, true, null, null)))
+                .extracting(VideoDtos.VideoDto::title).containsExactly("Cleopatra");
     }
 
     @Test

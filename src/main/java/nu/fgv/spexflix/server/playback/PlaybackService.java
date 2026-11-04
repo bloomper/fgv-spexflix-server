@@ -24,6 +24,8 @@ import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoDtos;
 import nu.fgv.spexflix.server.video.VideoDtos.VideoDto;
+import nu.fgv.spexflix.server.video.VideoDtos.VideoFilter;
+import nu.fgv.spexflix.server.video.VideoDtos.VideoSort;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoService;
 import nu.fgv.spexflix.server.video.VideoStatus;
@@ -35,6 +37,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +48,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Playing videos: signed addresses, progress, the watch list and ratings. Ratings are each user's own, 1 to 5;
- * every listed video also shows the average of everyone's.
+ * Playing videos: signed addresses, progress, the watch list, likes and ratings. Ratings are each user's own, 1 to 5;
+ * every listed video also shows the average of everyone's, and the top lists rank videos by everyone's ratings, likes
+ * and views.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -59,11 +63,21 @@ public class PlaybackService {
      */
     private static final double FINISHED = 0.95;
 
+    /**
+     * How many average votes a video's rating is weighed against in the top lists, so that a single 5 does not top
+     * them: the weighted average is {@code (PRIOR * mean + sum) / (PRIOR + count)}, where mean is the average of every
+     * rating.
+     */
+    static final int PRIOR = 2;
+
+    private static final int MAX_TOP = 100;
+
     private final VideoService videoService;
     private final VideoRepository videoRepository;
     private final WatchProgressRepository progressRepository;
     private final WatchListEntryRepository watchListRepository;
     private final VideoRatingRepository ratingRepository;
+    private final VideoLikeRepository likeRepository;
     private final CallerService callerService;
     private final PlaybackSigner signer;
     private final Duration margin;
@@ -71,7 +85,7 @@ public class PlaybackService {
 
     public PlaybackService(final VideoService videoService, final VideoRepository videoRepository,
                            final WatchProgressRepository progressRepository, final WatchListEntryRepository watchListRepository,
-                           final VideoRatingRepository ratingRepository,
+                           final VideoRatingRepository ratingRepository, final VideoLikeRepository likeRepository,
                            final CallerService callerService, final PlaybackSigner signer, final SpexflixProperties properties,
                            final Clock clock) {
         this.videoService = videoService;
@@ -79,6 +93,7 @@ public class PlaybackService {
         this.progressRepository = progressRepository;
         this.watchListRepository = watchListRepository;
         this.ratingRepository = ratingRepository;
+        this.likeRepository = likeRepository;
         this.callerService = callerService;
         this.signer = signer;
         this.margin = properties.media().linkMargin();
@@ -243,6 +258,181 @@ public class PlaybackService {
     }
 
     /**
+     * Likes a video, or takes the like back.
+     */
+    @Transactional
+    public void like(final UUID videoId, final boolean liked) {
+        final AppUser user = currentUser();
+
+        if (!liked) {
+            videoRepository.findByUuid(videoId)
+                    .flatMap(video -> likeRepository.findByUserIdAndVideoId(user.getId(), video.getId()))
+                    .ifPresent(likeRepository::delete);
+            return;
+        }
+
+        final Video video = videoService.visible(videoId);
+
+        if (likeRepository.findByUserIdAndVideoId(user.getId(), video.getId()).isEmpty()) {
+            final VideoLike like = new VideoLike();
+
+            like.setUserId(user.getId());
+            like.setVideoId(video.getId());
+            like.setLikedAt(clock.instant());
+            likeRepository.save(like);
+        }
+    }
+
+    /**
+     * The listed videos the caller likes, most recently liked first.
+     */
+    @Transactional(readOnly = true)
+    public List<VideoDto> likedVideos() {
+        final AppUser user = currentUser();
+
+        return listedInOrder(likeRepository.findByUserIdOrderByLikedAtDesc(user.getId()).stream().map(VideoLike::getVideoId).toList());
+    }
+
+    /**
+     * How many like each of some videos; videos nobody likes are left out.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Integer> likeCounts(final Collection<UUID> videoIds) {
+        if (videoIds.isEmpty()) {
+            return Map.of();
+        }
+
+        final Map<Long, UUID> uuids = videoRepository.findByUuidIn(videoIds).stream()
+                .collect(Collectors.toMap(Video::getId, Video::getUuid));
+        final Map<UUID, Integer> counts = new HashMap<>();
+
+        if (!uuids.isEmpty()) {
+            for (final Object[] row : likeRepository.count(uuids.keySet())) {
+                counts.put(uuids.get((Long) row[0]), ((Number) row[1]).intValue());
+            }
+        }
+        return counts;
+    }
+
+    /**
+     * The videos the filter lists, also narrowed to what the caller likes or has not watched, and in the asked order.
+     */
+    @Transactional
+    public List<VideoDto> browse(final @Nullable VideoFilter filter) {
+        List<VideoDto> videos = videoService.videos(filter);
+
+        if (filter == null) {
+            return videos;
+        }
+        if (Boolean.TRUE.equals(filter.liked()) || Boolean.TRUE.equals(filter.unwatched())) {
+            final AppUser user = currentUser();
+            final Map<UUID, Long> ids = ids(videos);
+            final Set<Long> liked = Boolean.TRUE.equals(filter.liked()) && !ids.isEmpty()
+                    ? likeRepository.findByUserIdAndVideoIdIn(user.getId(), ids.values()).stream().map(VideoLike::getVideoId).collect(Collectors.toSet())
+                    : Set.of();
+            final Set<Long> finished = Boolean.TRUE.equals(filter.unwatched())
+                    ? progressRepository.findByUserIdAndFinishedTrue(user.getId()).stream().map(WatchProgress::getVideoId).collect(Collectors.toSet())
+                    : Set.of();
+
+            videos = videos.stream()
+                    .filter(video -> !Boolean.TRUE.equals(filter.liked()) || liked.contains(ids.get(video.id())))
+                    .filter(video -> !Boolean.TRUE.equals(filter.unwatched()) || !finished.contains(ids.get(video.id())))
+                    .toList();
+        }
+        return sort(videos, filter.sort());
+    }
+
+    /**
+     * The listed videos the filter lists, ranked by everyone: by weighted average rating, by how many like them or by
+     * how many have watched them to the end. Videos without any are left out.
+     */
+    @Transactional(readOnly = true)
+    public List<VideoDto> top(final TopBy by, final @Nullable VideoFilter filter, final int limit) {
+        final List<VideoDto> candidates = videoService.videos(filter == null ? null
+                : new VideoFilter(filter.categoryId(), filter.year(), filter.spexId(), filter.kindId(), false,
+                filter.fromYear(), filter.toYear(), null, null, null));
+        final Map<UUID, Long> ids = ids(candidates);
+        final Map<Long, Double> scores = switch (by) {
+            case RATED -> ratingScores();
+            case LIKED -> counts(likeRepository.countAll());
+            case WATCHED -> counts(progressRepository.countFinished());
+        };
+
+        return candidates.stream()
+                .filter(video -> scores.containsKey(ids.get(video.id())))
+                .sorted(Comparator.comparingDouble((VideoDto video) -> scores.get(ids.get(video.id()))).reversed())
+                .limit(Math.clamp(limit, 1, MAX_TOP))
+                .toList();
+    }
+
+    private List<VideoDto> sort(final List<VideoDto> videos, final @Nullable VideoSort sort) {
+        if (sort == null || sort == VideoSort.YEAR_DESC) {
+            return videos;
+        }
+
+        final Comparator<VideoDto> order = switch (sort) {
+            case YEAR_DESC -> (first, second) -> 0;
+            case YEAR_ASC -> Comparator.comparing(VideoDto::year, Comparator.nullsLast(Comparator.naturalOrder()));
+            case TITLE -> Comparator.comparing(video -> video.title().toLowerCase(java.util.Locale.ROOT));
+            case PUBLISHED -> Comparator.comparing(VideoDto::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case RATING -> byScore(videos, ratingScores());
+            case LIKES -> byScore(videos, counts(likeRepository.countAll()));
+        };
+
+        // The list comes newest year first, then by title, which a stable sort keeps for ties
+        return videos.stream().sorted(order).toList();
+    }
+
+    private Comparator<VideoDto> byScore(final List<VideoDto> videos, final Map<Long, Double> scores) {
+        final Map<UUID, Long> ids = ids(videos);
+
+        return Comparator.comparingDouble((VideoDto video) -> scores.getOrDefault(ids.get(video.id()), -1.0)).reversed();
+    }
+
+    /**
+     * Every rated video's weighted average rating, by video id.
+     */
+    private Map<Long, Double> ratingScores() {
+        return weighted(ratingRepository.totals());
+    }
+
+    /**
+     * Weighted averages from rows of id, sum and count: each average drawn towards the mean of all ratings.
+     */
+    static Map<Long, Double> weighted(final List<Object[]> totals) {
+        double sum = 0;
+        long count = 0;
+
+        for (final Object[] row : totals) {
+            sum += ((Number) row[1]).doubleValue();
+            count += ((Number) row[2]).longValue();
+        }
+
+        final double mean = count == 0 ? 0 : sum / count;
+        final Map<Long, Double> scores = new HashMap<>();
+
+        for (final Object[] row : totals) {
+            scores.put((Long) row[0], (PRIOR * mean + ((Number) row[1]).doubleValue()) / (PRIOR + ((Number) row[2]).doubleValue()));
+        }
+        return scores;
+    }
+
+    private static Map<Long, Double> counts(final List<Object[]> rows) {
+        final Map<Long, Double> counts = new HashMap<>();
+
+        rows.forEach(row -> counts.put((Long) row[0], ((Number) row[1]).doubleValue()));
+        return counts;
+    }
+
+    private Map<UUID, Long> ids(final List<VideoDto> videos) {
+        if (videos.isEmpty()) {
+            return Map.of();
+        }
+        return videoRepository.findByUuidIn(videos.stream().map(VideoDto::id).toList()).stream()
+                .collect(Collectors.toMap(Video::getUuid, Video::getId));
+    }
+
+    /**
      * Everyone's average rating and number of ratings for some videos; videos nobody rated are left out.
      */
     @Transactional(readOnly = true)
@@ -265,14 +455,14 @@ public class PlaybackService {
     }
 
     /**
-     * The caller's progress, watch list and ratings for some videos, for the list fields of {@code Video}.
+     * The caller's progress, watch list, ratings and likes for some videos, for the list fields of {@code Video}.
      */
     @Transactional
     public PersonalState personal(final Collection<UUID> videoIds) {
         final Caller caller = callerService.currentIfAny().orElse(null);
 
         if (caller == null || !caller.isUser() || videoIds.isEmpty()) {
-            return new PersonalState(Map.of(), Set.of(), Map.of());
+            return new PersonalState(Map.of(), Set.of(), Map.of(), Set.of());
         }
 
         final AppUser user = callerService.record(caller);
@@ -285,7 +475,9 @@ public class PlaybackService {
 
         ratingRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).forEach(entry -> ratings.put(uuids.get(entry.getVideoId()), entry.getRating()));
         return new PersonalState(progress, watchListRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).stream()
-                .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()), ratings);
+                .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()), ratings,
+                likeRepository.findByUserIdAndVideoIdIn(user.getId(), uuids.keySet()).stream()
+                        .map(entry -> uuids.get(entry.getVideoId())).collect(Collectors.toSet()));
     }
 
     private List<VideoDto> listedInOrder(final List<Long> ids) {
@@ -310,7 +502,20 @@ public class PlaybackService {
     public record PlaybackSubtitleDto(String language, String label, String url) {
     }
 
-    public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList, Map<UUID, Integer> ratings) {
+    public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList, Map<UUID, Integer> ratings,
+                                Set<UUID> likes) {
+    }
+
+    /**
+     * What a top list ranks by.
+     */
+    public enum TopBy {
+        /** Everyone's ratings, as a weighted average. */
+        RATED,
+        /** How many like the video. */
+        LIKED,
+        /** How many have watched it to the end. */
+        WATCHED
     }
 
     public record RatingSummary(double average, int count) {

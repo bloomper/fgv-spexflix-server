@@ -121,6 +121,8 @@ public class VideoService {
         return (all ? videoRepository.findNotTrashed() : videoRepository.findListed()).stream()
                 .filter(video -> filter == null || filter.categoryId() == null || filter.categoryId().equals(categoryId(video)))
                 .filter(video -> filter == null || filter.year() == null || filter.year().equals(video.getYear()))
+                .filter(video -> filter == null || filter.fromYear() == null || (video.getYear() != null && video.getYear() >= filter.fromYear()))
+                .filter(video -> filter == null || filter.toYear() == null || (video.getYear() != null && video.getYear() <= filter.toYear()))
                 .filter(video -> filter == null || filter.spexId() == null || video.isAbout(filter.spexId()))
                 .filter(video -> filter == null || filter.kindId() == null || filter.kindId().equals(video.getKind().getUuid()))
                 .map(VideoDtos::toDto)

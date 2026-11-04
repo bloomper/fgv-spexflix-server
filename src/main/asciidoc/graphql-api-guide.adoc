@@ -130,6 +130,14 @@ Editors create and change collections (``collectionCreate``, ``collectionUpdate`
 
 Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 ``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.
+Viewers also like videos (``videoLike``); ``Video.liked`` is the caller's, ``likeCount`` everyone's, and ``likedVideos`` lists what the caller likes.
+``topVideos(by)`` ranks the listed videos by everyone: ``RATED`` by a weighted average, ``(2 × mean of all ratings + sum) / (2 + count)``, so that a single 5 does not top the list; ``LIKED`` by likes; ``WATCHED`` by how many have watched to the end.
+Its filter narrows by category, kind, spex and years (``fromYear``, ``toYear``).
+``videos`` takes the same filter, plus ``liked`` and ``unwatched`` for the caller and a ``sort`` (``YEAR_DESC``, the default, ``YEAR_ASC``, ``TITLE``, ``PUBLISHED``, ``RATING`` or ``LIKES``).
+
+Playlists are each viewer's own lists of whole videos and clips (``playlistCreate``, ``playlistAddItem``, ``playlistReorder``, ``playlistRemoveItem``).
+A clip is a chapter: ``playlistAddItem`` with ``startSeconds`` takes the chapter that starts there and keeps its title and its end (the next chapter's start, or the end of the video), since editing chapters replaces them.
+Only the owner changes a playlist; a public one (``isPublic``) is listed and played by everyone, and listeners see only its listed videos.
 
 [[audit]]
 == Audit

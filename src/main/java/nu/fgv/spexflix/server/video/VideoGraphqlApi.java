@@ -62,7 +62,18 @@ public class VideoGraphqlApi {
 
     @QueryMapping
     public List<VideoDto> videos(@Argument final @Nullable VideoFilter filter) {
-        return service.videos(filter);
+        return playbackService.browse(filter);
+    }
+
+    @QueryMapping
+    public List<VideoDto> likedVideos() {
+        return playbackService.likedVideos();
+    }
+
+    @QueryMapping
+    public List<VideoDto> topVideos(@Argument final PlaybackService.@Nullable TopBy by, @Argument final @Nullable VideoFilter filter,
+                                    @Argument final @Nullable Integer limit) {
+        return playbackService.top(by == null ? PlaybackService.TopBy.RATED : by, filter, limit == null ? 20 : limit);
     }
 
     @QueryMapping
@@ -182,6 +193,24 @@ public class VideoGraphqlApi {
         return result;
     }
 
+    @BatchMapping(typeName = "Video", field = "liked")
+    public Map<VideoDto, Boolean> liked(final List<VideoDto> videos) {
+        final PlaybackService.PersonalState state = playbackService.personal(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, Boolean> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> result.put(video, state.likes().contains(video.id())));
+        return result;
+    }
+
+    @BatchMapping(typeName = "Video", field = "likeCount")
+    public Map<VideoDto, Integer> likeCount(final List<VideoDto> videos) {
+        final Map<UUID, Integer> counts = playbackService.likeCounts(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, Integer> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> result.put(video, counts.getOrDefault(video.id(), 0)));
+        return result;
+    }
+
     @BatchMapping(typeName = "Video", field = "job")
     public Map<VideoDto, ProcessingService.@Nullable JobDto> job(final List<VideoDto> videos) {
         final Map<UUID, ProcessingService.JobDto> jobs = processingService.latest(videos.stream().map(VideoDto::id).toList());
@@ -274,6 +303,12 @@ public class VideoGraphqlApi {
     @MutationMapping
     public @Nullable Void videoRate(@Argument final UUID videoId, @Argument final int rating) {
         playbackService.rate(videoId, rating);
+        return null;
+    }
+
+    @MutationMapping
+    public @Nullable Void videoLike(@Argument final UUID videoId, @Argument final boolean liked) {
+        playbackService.like(videoId, liked);
         return null;
     }
 

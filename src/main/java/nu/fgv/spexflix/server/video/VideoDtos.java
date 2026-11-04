@@ -79,8 +79,35 @@ public final class VideoDtos {
     public record CategoryDto(UUID id, String name, int videoCount) {
     }
 
+    /**
+     * What to list of the videos. {@code fromYear} and {@code toYear} include their years; {@code liked} and
+     * {@code unwatched} are about the caller.
+     */
     public record VideoFilter(@Nullable UUID categoryId, @Nullable Integer year, @Nullable UUID spexId,
-                              @Nullable UUID kindId, @Nullable Boolean includeUnpublished) {
+                              @Nullable UUID kindId, @Nullable Boolean includeUnpublished, @Nullable Integer fromYear,
+                              @Nullable Integer toYear, @Nullable Boolean liked, @Nullable Boolean unwatched,
+                              @Nullable VideoSort sort) {
+
+        public VideoFilter(final @Nullable UUID categoryId, final @Nullable Integer year, final @Nullable UUID spexId,
+                           final @Nullable UUID kindId, final @Nullable Boolean includeUnpublished) {
+            this(categoryId, year, spexId, kindId, includeUnpublished, null, null, null, null, null);
+        }
+    }
+
+    /**
+     * How to order a list of videos. Ties are broken by year, newest first, then title.
+     */
+    public enum VideoSort {
+        /** Newest spex year first; the default. */
+        YEAR_DESC,
+        YEAR_ASC,
+        TITLE,
+        /** Most recently published first. */
+        PUBLISHED,
+        /** Highest weighted average rating first; unrated videos last. */
+        RATING,
+        /** Most liked first. */
+        LIKES
     }
 
     public record VideoInput(@Nullable List<UUID> spexIds, @Nullable String title, @Nullable Integer year, @Nullable UUID kindId,
