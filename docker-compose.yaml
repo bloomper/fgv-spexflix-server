@@ -3,6 +3,7 @@ name: fgv-spexflix-server
 services:
   spexflix-mysql:
     image: 'mysql:8.4'
+    restart: unless-stopped
     command: --log-error=/var/log/mysql/error.log
     environment:
       MYSQL_HOST: localhost
@@ -28,6 +29,7 @@ services:
 
   spexflix-media:
     image: 'nginx:1.29-alpine'
+    restart: unless-stopped
     command:
       - sh
       - -c
@@ -75,7 +77,7 @@ services:
       API_SAMPLE_DATA_PREPROCESSED: ${API_SAMPLE_DATA_PREPROCESSED:-false}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak-server:8080/auth/realms/fgv/protocol/openid-connect/certs
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://auth.fgv.local.nu:8443/auth/realms/fgv
-    restart: on-failure
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000;printf \"GET /actuator/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n\" >&3;grep -q \"^HTTP/1.1 200\" <&3" ]
       interval: 10s
