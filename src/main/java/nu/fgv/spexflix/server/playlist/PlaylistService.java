@@ -75,6 +75,15 @@ public class PlaylistService {
         this.clock = clock;
     }
 
+    static int indexOf(final List<Chapter> chapters, final int startSeconds) {
+        for (int i = 0; i < chapters.size(); i++) {
+            if (chapters.get(i).getStartSeconds() == startSeconds) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /**
      * The caller's playlists, by name, then everyone else's public ones, by name.
      */
@@ -210,15 +219,6 @@ public class PlaylistService {
         return toDto(playlist, user, user);
     }
 
-    static int indexOf(final List<Chapter> chapters, final int startSeconds) {
-        for (int i = 0; i < chapters.size(); i++) {
-            if (chapters.get(i).getStartSeconds() == startSeconds) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     private void apply(final Playlist playlist, final PlaylistInput input) {
         final String name = input.name() == null ? "" : input.name().strip();
         final String description = StringUtils.hasText(input.description()) ? input.description().strip() : null;
@@ -268,7 +268,8 @@ public class PlaylistService {
     }
 
     public record PlaylistDto(UUID id, String name, @Nullable String description, boolean isPublic, boolean owned,
-                              @Nullable String ownerName, List<PlaylistItemDto> items, int itemCount, double durationSeconds,
+                              @Nullable String ownerName, List<PlaylistItemDto> items, int itemCount,
+                              double durationSeconds,
                               Instant createdAt, Instant updatedAt) {
     }
 

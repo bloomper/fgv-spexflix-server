@@ -23,7 +23,6 @@ import nu.fgv.spexflix.server.processing.MediaStorage;
 import nu.fgv.spexflix.server.processing.ProcessingJob;
 import nu.fgv.spexflix.server.processing.ProcessingJobRepository;
 import nu.fgv.spexflix.server.processing.Transcoder;
-import nu.fgv.spexflix.server.spex.SpexDto;
 import nu.fgv.spexflix.server.spex.SpexService;
 import nu.fgv.spexflix.server.upload.UploadService;
 import nu.fgv.spexflix.server.user.Caller;
@@ -110,6 +109,10 @@ public class VideoService {
         return value.length() > MAX_TEXT ? value.substring(0, MAX_TEXT) : value;
     }
 
+    private static @Nullable UUID categoryId(final Video video) {
+        return video.mainSpex() == null ? null : video.mainSpex().getCategoryId();
+    }
+
     @Transactional(readOnly = true)
     public List<VideoDto> videos(final @Nullable VideoFilter filter) {
         final Caller caller = callerService.current();
@@ -192,6 +195,8 @@ public class VideoService {
                 .sorted(Comparator.reverseOrder()).toList();
     }
 
+    // ---------------------------------------------------------------------------------------------------- editing
+
     @Transactional(readOnly = true)
     public List<VideoDto> search(final String query) {
         final Caller caller = callerService.current();
@@ -206,8 +211,6 @@ public class VideoService {
         return videoRepository.search("%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", caller.isEditor())
                 .stream().limit(50).map(VideoDtos::toDto).toList();
     }
-
-    // ---------------------------------------------------------------------------------------------------- editing
 
     @Transactional(readOnly = true)
     public List<VideoDto> trash() {
@@ -236,10 +239,6 @@ public class VideoService {
         apply(video, input);
         auditService.record("UPDATE", "VIDEO", video.getUuid(), "Ändrade filmen " + video.getTitle());
         return VideoDtos.toDto(video);
-    }
-
-    private static @Nullable UUID categoryId(final Video video) {
-        return video.mainSpex() == null ? null : video.mainSpex().getCategoryId();
     }
 
     private void apply(final Video video, final VideoInput input) {

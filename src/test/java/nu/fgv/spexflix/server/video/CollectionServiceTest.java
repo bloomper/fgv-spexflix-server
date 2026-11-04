@@ -64,14 +64,6 @@ class CollectionServiceTest {
     private VideoKind show;
     private VideoKind trailer;
 
-    @BeforeEach
-    void setUp() {
-        service = new CollectionService(repository, videoRepository, callerService, auditService);
-        show = kind(1);
-        trailer = kind(2);
-        lenient().when(callerService.current()).thenReturn(TestCallers.viewer());
-    }
-
     private static VideoKind kind(final int position) {
         final VideoKind kind = new VideoKind();
 
@@ -80,6 +72,14 @@ class CollectionServiceTest {
         kind.setNameEn("Kind " + position);
         kind.setPosition(position);
         return kind;
+    }
+
+    @BeforeEach
+    void setUp() {
+        service = new CollectionService(repository, videoRepository, callerService, auditService);
+        show = kind(1);
+        trailer = kind(2);
+        lenient().when(callerService.current()).thenReturn(TestCallers.viewer());
     }
 
     private Video video(final long id, final VideoKind kind, final LocalDate performed, final boolean listed) {

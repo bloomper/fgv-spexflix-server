@@ -59,17 +59,15 @@ import java.util.stream.Collectors;
 public class PlaybackService {
 
     /**
-     * How close to the end a video counts as watched.
-     */
-    private static final double FINISHED = 0.95;
-
-    /**
      * How many average votes a video's rating is weighed against in the top lists, so that a single 5 does not top
      * them: the weighted average is {@code (PRIOR * mean + sum) / (PRIOR + count)}, where mean is the average of every
      * rating.
      */
     static final int PRIOR = 2;
-
+    /**
+     * How close to the end a video counts as watched.
+     */
+    private static final double FINISHED = 0.95;
     private static final int MAX_TOP = 100;
 
     private final VideoService videoService;
@@ -98,6 +96,34 @@ public class PlaybackService {
         this.signer = signer;
         this.margin = properties.media().linkMargin();
         this.clock = clock;
+    }
+
+    /**
+     * Weighted averages from rows of id, sum and count: each average drawn towards the mean of all ratings.
+     */
+    static Map<Long, Double> weighted(final List<Object[]> totals) {
+        double sum = 0;
+        long count = 0;
+
+        for (final Object[] row : totals) {
+            sum += ((Number) row[1]).doubleValue();
+            count += ((Number) row[2]).longValue();
+        }
+
+        final double mean = count == 0 ? 0 : sum / count;
+        final Map<Long, Double> scores = new HashMap<>();
+
+        for (final Object[] row : totals) {
+            scores.put((Long) row[0], (PRIOR * mean + ((Number) row[1]).doubleValue()) / (PRIOR + ((Number) row[2]).doubleValue()));
+        }
+        return scores;
+    }
+
+    private static Map<Long, Double> counts(final List<Object[]> rows) {
+        final Map<Long, Double> counts = new HashMap<>();
+
+        rows.forEach(row -> counts.put((Long) row[0], ((Number) row[1]).doubleValue()));
+        return counts;
     }
 
     @Transactional(readOnly = true)
@@ -374,7 +400,8 @@ public class PlaybackService {
             case YEAR_DESC -> (first, second) -> 0;
             case YEAR_ASC -> Comparator.comparing(VideoDto::year, Comparator.nullsLast(Comparator.naturalOrder()));
             case TITLE -> Comparator.comparing(video -> video.title().toLowerCase(java.util.Locale.ROOT));
-            case PUBLISHED -> Comparator.comparing(VideoDto::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case PUBLISHED ->
+                    Comparator.comparing(VideoDto::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
             case RATING -> byScore(videos, ratingScores());
             case LIKES -> byScore(videos, counts(likeRepository.countAll()));
         };
@@ -394,34 +421,6 @@ public class PlaybackService {
      */
     private Map<Long, Double> ratingScores() {
         return weighted(ratingRepository.totals());
-    }
-
-    /**
-     * Weighted averages from rows of id, sum and count: each average drawn towards the mean of all ratings.
-     */
-    static Map<Long, Double> weighted(final List<Object[]> totals) {
-        double sum = 0;
-        long count = 0;
-
-        for (final Object[] row : totals) {
-            sum += ((Number) row[1]).doubleValue();
-            count += ((Number) row[2]).longValue();
-        }
-
-        final double mean = count == 0 ? 0 : sum / count;
-        final Map<Long, Double> scores = new HashMap<>();
-
-        for (final Object[] row : totals) {
-            scores.put((Long) row[0], (PRIOR * mean + ((Number) row[1]).doubleValue()) / (PRIOR + ((Number) row[2]).doubleValue()));
-        }
-        return scores;
-    }
-
-    private static Map<Long, Double> counts(final List<Object[]> rows) {
-        final Map<Long, Double> counts = new HashMap<>();
-
-        rows.forEach(row -> counts.put((Long) row[0], ((Number) row[1]).doubleValue()));
-        return counts;
     }
 
     private Map<UUID, Long> ids(final List<VideoDto> videos) {
@@ -495,6 +494,24 @@ public class PlaybackService {
         return callerService.record(caller);
     }
 
+    /**
+     * What a top list ranks by.
+     */
+    public enum TopBy {
+        /**
+         * Everyone's ratings, as a weighted average.
+         */
+        RATED,
+        /**
+         * How many like the video.
+         */
+        LIKED,
+        /**
+         * How many have watched it to the end.
+         */
+        WATCHED
+    }
+
     public record PlaybackDto(String masterUrl, @Nullable String thumbnailsUrl, List<PlaybackSubtitleDto> subtitles,
                               Instant expiresAt) {
     }
@@ -504,18 +521,6 @@ public class PlaybackService {
 
     public record PersonalState(Map<UUID, WatchProgress> progress, Set<UUID> watchList, Map<UUID, Integer> ratings,
                                 Set<UUID> likes) {
-    }
-
-    /**
-     * What a top list ranks by.
-     */
-    public enum TopBy {
-        /** Everyone's ratings, as a weighted average. */
-        RATED,
-        /** How many like the video. */
-        LIKED,
-        /** How many have watched it to the end. */
-        WATCHED
     }
 
     public record RatingSummary(double average, int count) {

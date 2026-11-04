@@ -17,11 +17,11 @@ package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.TestCallers;
 import nu.fgv.spexflix.server.audit.AuditService;
-import nu.fgv.spexflix.server.video.VideoKindService.VideoKindDto;
-import nu.fgv.spexflix.server.video.VideoKindService.VideoKindInput;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
+import nu.fgv.spexflix.server.video.VideoKindService.VideoKindDto;
+import nu.fgv.spexflix.server.video.VideoKindService.VideoKindInput;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

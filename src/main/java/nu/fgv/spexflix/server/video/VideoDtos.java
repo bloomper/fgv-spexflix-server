@@ -50,6 +50,30 @@ public final class VideoDtos {
                 video.getCreatedAt(), video.getLastModifiedAt());
     }
 
+    /**
+     * How to order a list of videos. Ties are broken by year, newest first, then title.
+     */
+    public enum VideoSort {
+        /**
+         * Newest spex year first; the default.
+         */
+        YEAR_DESC,
+        YEAR_ASC,
+        TITLE,
+        /**
+         * Most recently published first.
+         */
+        PUBLISHED,
+        /**
+         * Highest weighted average rating first; unrated videos last.
+         */
+        RATING,
+        /**
+         * Most liked first.
+         */
+        LIKES
+    }
+
     public record VideoDto(UUID id, String title, @Nullable Integer year, VideoKindService.VideoKindDto kind,
                            @Nullable String performance, @Nullable String performanceDate, @Nullable String description,
                            List<VideoSpexDto> spex, VideoStatus status, @Nullable String failure,
@@ -94,23 +118,8 @@ public final class VideoDtos {
         }
     }
 
-    /**
-     * How to order a list of videos. Ties are broken by year, newest first, then title.
-     */
-    public enum VideoSort {
-        /** Newest spex year first; the default. */
-        YEAR_DESC,
-        YEAR_ASC,
-        TITLE,
-        /** Most recently published first. */
-        PUBLISHED,
-        /** Highest weighted average rating first; unrated videos last. */
-        RATING,
-        /** Most liked first. */
-        LIKES
-    }
-
-    public record VideoInput(@Nullable List<UUID> spexIds, @Nullable String title, @Nullable Integer year, @Nullable UUID kindId,
+    public record VideoInput(@Nullable List<UUID> spexIds, @Nullable String title, @Nullable Integer year,
+                             @Nullable UUID kindId,
                              @Nullable String performance, @Nullable String performanceDate,
                              @Nullable String description) {
     }

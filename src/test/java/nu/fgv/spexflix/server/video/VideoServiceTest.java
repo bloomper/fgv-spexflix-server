@@ -75,7 +75,7 @@ class VideoServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T10:00:00Z");
     private static final SpexDto CLEOPATRA = new SpexDto(uuid(7), "Cleopatra", 2024, false, null, uuid(1), "Chalmersspexet");
-
+    private static final VideoKind SHOW = kind(1, "Föreställning", "Show");
     private final List<Video> videos = new ArrayList<>();
     @Mock
     private VideoRepository videoRepository;
@@ -110,8 +110,6 @@ class VideoServiceTest {
         kind.setPosition((int) id);
         return kind;
     }
-
-    private static final VideoKind SHOW = kind(1, "Föreställning", "Show");
 
     private static Video video(final long id, final String title, final VideoStatus status, final boolean published) {
         final Video video = new Video();
