@@ -36,6 +36,10 @@ type Query {
     categories: [Category!]!
     "USER. The years of the published videos, newest first."
     years: [Int!]!
+    "USER. Everyone credited in the listed videos (every video outside the trash for EDITOR), by name, with how many videos each."
+    credits: [Credit!]!
+    "USER. The videos that credit a name, regardless of case, newest first, with what the name does in each."
+    creditVideos(name: String!): [CreditedVideo!]!
     "USER. Videos whose titles, spex, descriptions, performances or chapters match."
     search(q: String!): [Video!]!
     "USER. Signed addresses for playing a ready video, valid for its duration plus a margin."
@@ -81,6 +85,8 @@ type Mutation {
     videoPosterFrame(id: ID!, seconds: Float!): Video!
     "ADMIN. Processes the original again."
     videoReprocess(id: ID!): Video!
+    "EDITOR. Replaces who takes part in the video, in the given order; rows without a name are left out."
+    creditsSet(videoId: ID!, credits: [CreditInput!]!): Video!
     "EDITOR. Replaces the video's chapters."
     chaptersSet(videoId: ID!, chapters: [ChapterInput!]!): Video!
     "EDITOR."
@@ -301,6 +307,8 @@ type Video {
     posterSeconds: Float
     renditions: [Rendition!]!
     chapters: [Chapter!]!
+    "Who takes part, in order."
+    credits: [VideoCredit!]!
     subtitles: [Subtitle!]!
     "The caller's position, in seconds, or null."
     progressSeconds: Int
@@ -311,6 +319,8 @@ type Video {
     liked: Boolean!
     "How many like the video."
     likeCount: Int!
+    "How many have watched the video to the end."
+    watchCount: Int!
     "The caller's rating, 1 to 5, or 0 when not rated."
     myRating: Int!
     "Everyone's average rating, or null when nobody has rated it."
@@ -514,4 +524,27 @@ input PlaylistInput {
     name: String!
     description: String
     isPublic: Boolean = false
+}
+
+"Someone who takes part in a video."
+type VideoCredit {
+    name: String!
+    "What they do or play, e.g. Kleopatra or Regi."
+    role: String
+}
+
+input CreditInput {
+    name: String!
+    role: String
+}
+
+type Credit {
+    name: String!
+    videoCount: Int!
+}
+
+type CreditedVideo {
+    video: Video!
+    "What the name does or plays in the video."
+    role: String
 }

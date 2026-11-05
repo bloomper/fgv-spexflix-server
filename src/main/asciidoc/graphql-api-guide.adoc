@@ -126,12 +126,14 @@ Progress (``progressSave``) and the watch list are per user.
 Collections (``collections``, ``collection``) hold videos in an order of their own; a video can be in several.
 Listeners see a collection's listed videos only, and only collections with one.
 Editors create and change collections (``collectionCreate``, ``collectionUpdate``); only admins delete them, and their videos stay.
+``Video.credits`` lists who takes part, in order: a name and, optionally, what they do or play; editors replace them with ``creditsSet``, which leaves out rows without a name.
+``credits`` lists everyone credited, by name with their number of videos, and ``creditVideos(name)`` their videos with their roles; names are matched regardless of case.
 ``Video.next`` is what plays after a video: the next listed video in its first collection, by title, that has one after it, else the next listed video of the same main spex, revivals counting as their original, by kind and performance date.
 
 Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 ``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.
 Viewers also like videos (``videoLike``); ``Video.liked`` is the caller's, ``likeCount`` everyone's, and ``likedVideos`` lists what the caller likes.
-``topVideos(by)`` ranks the listed videos by everyone: ``RATED`` by a weighted average, ``(2 × mean of all ratings + sum) / (2 + count)``, so that a single 5 does not top the list; ``LIKED`` by likes; ``WATCHED`` by how many have watched to the end.
+``topVideos(by)`` ranks the listed videos by everyone: ``RATED`` by a weighted average, ``(2 × mean of all ratings + sum) / (2 + count)``, so that a single 5 does not top the list; ``LIKED`` by likes; ``WATCHED`` by how many have watched to the end, which ``Video.watchCount`` gives.
 Its filter narrows by category, kind, spex and years (``fromYear``, ``toYear``).
 ``videos`` takes the same filter, plus ``liked`` and ``unwatched`` for the caller and a ``sort`` (``YEAR_DESC``, the default, ``YEAR_ASC``, ``TITLE``, ``PUBLISHED``, ``RATING`` or ``LIKES``).
 

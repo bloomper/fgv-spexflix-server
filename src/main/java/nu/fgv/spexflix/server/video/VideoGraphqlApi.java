@@ -211,6 +211,15 @@ public class VideoGraphqlApi {
         return result;
     }
 
+    @BatchMapping(typeName = "Video", field = "watchCount")
+    public Map<VideoDto, Integer> watchCount(final List<VideoDto> videos) {
+        final Map<UUID, Integer> counts = playbackService.watchCounts(videos.stream().map(VideoDto::id).toList());
+        final Map<VideoDto, Integer> result = new LinkedHashMap<>();
+
+        videos.forEach(video -> result.put(video, counts.getOrDefault(video.id(), 0)));
+        return result;
+    }
+
     @BatchMapping(typeName = "Video", field = "job")
     public Map<VideoDto, ProcessingService.@Nullable JobDto> job(final List<VideoDto> videos) {
         final Map<UUID, ProcessingService.JobDto> jobs = processingService.latest(videos.stream().map(VideoDto::id).toList());
