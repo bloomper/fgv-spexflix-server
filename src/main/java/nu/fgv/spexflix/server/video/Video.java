@@ -74,6 +74,11 @@ public class Video extends AbstractAuditable {
     @OrderColumn(name = "position")
     private List<SpexRef> spex = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "video_credit", joinColumns = @JoinColumn(name = "video_id"))
+    @OrderColumn(name = "position")
+    private List<Credit> credits = new ArrayList<>();
+
     @Column(name = "title", nullable = false)
     private String title;
 

@@ -45,6 +45,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -324,6 +325,19 @@ public class PlaybackService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, Integer> likeCounts(final Collection<UUID> videoIds) {
+        return countsOf(videoIds, likeRepository::count);
+    }
+
+    /**
+     * How many have watched each of some videos to the end; videos nobody finished are left out.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Integer> watchCounts(final Collection<UUID> videoIds) {
+        return countsOf(videoIds, progressRepository::countFinished);
+    }
+
+    private Map<UUID, Integer> countsOf(final Collection<UUID> videoIds,
+                                        final Function<Collection<Long>, List<Object[]>> query) {
         if (videoIds.isEmpty()) {
             return Map.of();
         }
@@ -333,7 +347,7 @@ public class PlaybackService {
         final Map<UUID, Integer> counts = new HashMap<>();
 
         if (!uuids.isEmpty()) {
-            for (final Object[] row : likeRepository.count(uuids.keySet())) {
+            for (final Object[] row : query.apply(uuids.keySet())) {
                 counts.put(uuids.get((Long) row[0]), ((Number) row[1]).intValue());
             }
         }

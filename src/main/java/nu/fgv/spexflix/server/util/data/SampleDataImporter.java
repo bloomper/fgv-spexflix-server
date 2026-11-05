@@ -21,10 +21,17 @@ import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.audit.AuditEntry;
 import nu.fgv.spexflix.server.audit.AuditEntryRepository;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
+import nu.fgv.spexflix.server.playback.VideoLike;
+import nu.fgv.spexflix.server.playback.VideoLikeRepository;
+import nu.fgv.spexflix.server.playback.VideoRating;
+import nu.fgv.spexflix.server.playback.VideoRatingRepository;
 import nu.fgv.spexflix.server.playback.WatchListEntry;
 import nu.fgv.spexflix.server.playback.WatchListEntryRepository;
 import nu.fgv.spexflix.server.playback.WatchProgress;
 import nu.fgv.spexflix.server.playback.WatchProgressRepository;
+import nu.fgv.spexflix.server.playlist.Playlist;
+import nu.fgv.spexflix.server.playlist.PlaylistItem;
+import nu.fgv.spexflix.server.playlist.PlaylistRepository;
 import nu.fgv.spexflix.server.processing.Ffmpeg;
 import nu.fgv.spexflix.server.processing.JobStatus;
 import nu.fgv.spexflix.server.processing.MediaStorage;
@@ -39,6 +46,7 @@ import nu.fgv.spexflix.server.user.AppUser;
 import nu.fgv.spexflix.server.user.AppUserRepository;
 import nu.fgv.spexflix.server.util.security.SecurityUtil;
 import nu.fgv.spexflix.server.video.Chapter;
+import nu.fgv.spexflix.server.video.Credit;
 import nu.fgv.spexflix.server.video.SpexRef;
 import nu.fgv.spexflix.server.video.Subtitle;
 import nu.fgv.spexflix.server.video.Video;
@@ -48,6 +56,7 @@ import nu.fgv.spexflix.server.video.VideoKind;
 import nu.fgv.spexflix.server.video.VideoKindRepository;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoStatus;
+import org.jspecify.annotations.Nullable;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -80,6 +89,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -107,8 +118,15 @@ public class SampleDataImporter {
     static final String NO_ACCESS = "no-access@fgv.nu";
     private static final int SPEXREGISTER_ATTEMPTS = 30;
     private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
-    private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
+    private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "playlist_item", "playlist", "video_like", "video_credit", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
             "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
+    /** Sample cast and crew, with what they do or play; each show credits some of them. */
+    private static final List<String[]> CREDITS = List.of(
+            new String[]{"Anna Andersson", "Kleopatra"}, new String[]{"Bertil Berg", "Caesar"},
+            new String[]{"Cecilia Ceder", "Berättaren"}, new String[]{"David Dahl", "Hjälten"},
+            new String[]{"Eva Ek", "Kören"}, new String[]{"Fredrik Falk", "Orkesterledare"},
+            new String[]{"Gustav Gran", "Regi"}, new String[]{"Hanna Holm", "Koreografi"},
+            new String[]{"Ivar Ivarsson", "Ljus"}, new String[]{"Johanna Jern", "Ljud"});
     private static final List<String> CHAPTERS = List.of("Ouvertyr", "Öppningskören", "Kärleksduetten", "Hovets klagan",
             "Rövarvisan", "Ödets nummer", "Finalen", "Extranumret");
     private static final String SUBTITLES_SV = """
@@ -147,6 +165,9 @@ public class SampleDataImporter {
     private final ProcessingJobRepository jobRepository;
     private final AppUserRepository userRepository;
     private final WatchProgressRepository progressRepository;
+    private final VideoRatingRepository ratingRepository;
+    private final VideoLikeRepository likeRepository;
+    private final PlaylistRepository playlistRepository;
     private final WatchListEntryRepository watchListRepository;
     private final AuditEntryRepository auditRepository;
     private final Clock clock;
@@ -159,6 +180,8 @@ public class SampleDataImporter {
                               final VideoRepository videoRepository, final VideoKindRepository videoKindRepository,
                               final VideoCollectionRepository collectionRepository, final ProcessingJobRepository jobRepository,
                               final AppUserRepository userRepository, final WatchProgressRepository progressRepository,
+                              final VideoRatingRepository ratingRepository, final VideoLikeRepository likeRepository,
+                              final PlaylistRepository playlistRepository,
                               final WatchListEntryRepository watchListRepository, final AuditEntryRepository auditRepository,
                               final Clock clock) {
         this.properties = properties;
@@ -178,6 +201,9 @@ public class SampleDataImporter {
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
         this.progressRepository = progressRepository;
+        this.ratingRepository = ratingRepository;
+        this.likeRepository = likeRepository;
+        this.playlistRepository = playlistRepository;
         this.watchListRepository = watchListRepository;
         this.auditRepository = auditRepository;
         this.clock = clock;
@@ -283,6 +309,8 @@ public class SampleDataImporter {
                 }
             }
             transactionTemplate.executeWithoutResult(_ -> createViewing(users.get(USER)));
+            transactionTemplate.executeWithoutResult(_ -> createCommunity(List.of(users.get(ADMIN), users.get(EDITOR), users.get(USER))));
+            transactionTemplate.executeWithoutResult(_ -> createPlaylist(users.get(USER)));
             transactionTemplate.executeWithoutResult(_ -> createCollection());
             transactionTemplate.executeWithoutResult(_ -> createAudit(users.get(EDITOR)));
         } finally {
@@ -432,6 +460,12 @@ public class SampleDataImporter {
         video.setCreatedBy("system");
         if (show) {
             addChapters(video, picked.id());
+            // Five to eight credits, starting at a different person for each video so that names recur across videos
+            for (int i = 0; i < 5 + index % 4; i++) {
+                final String[] credit = CREDITS.get((index + i) % CREDITS.size());
+
+                video.getCredits().add(new Credit(credit[0], credit[1]));
+            }
         }
         if (index % 3 == 0) {
             addSubtitle(video, "sv", "Svenska");
@@ -539,6 +573,98 @@ public class SampleDataImporter {
             entry.setAddedAt(now.minus(Duration.ofDays(i)));
             watchListRepository.save(entry);
         }
+    }
+
+    /**
+     * Ratings, likes and views to the end by the sample users, so that averages and the top lists have something to
+     * show. The user's own "continue watching" from {@link #createViewing} is kept.
+     */
+    private void createCommunity(final List<AppUser> users) {
+        final List<Video> videos = videoRepository.findAll().stream()
+                .filter(video -> video.isPublished() && !video.isTrashed() && video.getStatus() != VideoStatus.FAILED)
+                .toList();
+        final Set<String> watched = progressRepository.findAll().stream()
+                .map(progress -> progress.getUserId() + ":" + progress.getVideoId())
+                .collect(Collectors.toSet());
+        final Random random = new Random(11);
+        final Instant now = clock.instant();
+
+        for (final AppUser user : users) {
+            for (final Video video : videos) {
+                if (random.nextInt(10) < 6) {
+                    final VideoRating rating = new VideoRating();
+
+                    rating.setUserId(user.getId());
+                    rating.setVideoId(video.getId());
+                    rating.setRating(Math.min(5, 2 + random.nextInt(3) + random.nextInt(2)));
+                    rating.setRatedAt(now.minus(Duration.ofDays(random.nextInt(60))));
+                    ratingRepository.save(rating);
+                }
+                if (random.nextInt(10) < 3) {
+                    final VideoLike like = new VideoLike();
+
+                    like.setUserId(user.getId());
+                    like.setVideoId(video.getId());
+                    like.setLikedAt(now.minus(Duration.ofDays(random.nextInt(60))));
+                    likeRepository.save(like);
+                }
+                if (random.nextInt(10) < 4 && !watched.contains(user.getId() + ":" + video.getId())) {
+                    final WatchProgress progress = new WatchProgress();
+
+                    progress.setUserId(user.getId());
+                    progress.setVideoId(video.getId());
+                    progress.setPositionSeconds(0);
+                    progress.setFinished(true);
+                    progress.setUpdatedAt(now.minus(Duration.ofDays(random.nextInt(60) + 1)));
+                    progressRepository.save(progress);
+                }
+            }
+        }
+    }
+
+    /**
+     * A playlist of the user's with a whole video and a clip, i.e. one chapter of another video.
+     */
+    private void createPlaylist(final AppUser user) {
+        final List<Video> videos = videoRepository.findAll().stream()
+                .filter(Video::isPublished).filter(video -> !video.isTrashed())
+                .toList();
+        final Video clipFrom = videos.stream().filter(video -> video.getChapters().size() > 1).findFirst().orElse(null);
+
+        if (videos.isEmpty()) {
+            return;
+        }
+
+        final Instant now = clock.instant();
+        final Playlist playlist = new Playlist();
+
+        playlist.setUserId(user.getId());
+        playlist.setName("Favoriter att visa nya");
+        playlist.setDescription("Exempeldata: en hel film och ett klipp.");
+        playlist.setCreatedAt(now);
+        playlist.setUpdatedAt(now);
+        playlist.getItems().add(item(playlist, 0, videos.getFirst(), null, null, null, now));
+        if (clipFrom != null) {
+            final Chapter chapter = clipFrom.getChapters().get(1);
+            final Integer end = clipFrom.getChapters().size() > 2 ? clipFrom.getChapters().get(2).getStartSeconds() : null;
+
+            playlist.getItems().add(item(playlist, 1, clipFrom, chapter.getStartSeconds(), end, chapter.getTitle(), now));
+        }
+        playlistRepository.save(playlist);
+    }
+
+    private static PlaylistItem item(final Playlist playlist, final int position, final Video video, final @Nullable Integer start,
+                                     final @Nullable Integer end, final @Nullable String title, final Instant at) {
+        final PlaylistItem item = new PlaylistItem();
+
+        item.setPlaylist(playlist);
+        item.setPosition(position);
+        item.setVideo(video);
+        item.setStartSeconds(start);
+        item.setEndSeconds(end);
+        item.setTitle(title);
+        item.setAddedAt(at);
+        return item;
     }
 
     /**
