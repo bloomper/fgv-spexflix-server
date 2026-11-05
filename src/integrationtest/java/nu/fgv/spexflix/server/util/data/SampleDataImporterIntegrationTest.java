@@ -83,9 +83,15 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
         // Chapters link to Spexify's track for Nobel, which the stand-in for Spexify has
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM chapter WHERE spexify_track_id = '00000000-0000-7000-8000-000000000011'").query(Long.class).single()).isPositive();
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM subtitle").query(Long.class).single()).isPositive();
+        // The user's "continue watching" (one started, one finished), plus views to the end by every sample user
         assertThat(jdbcClient.sql("""
-                        SELECT COUNT(*) FROM watch_progress p JOIN app_user u ON u.id = p.user_id WHERE u.username = ?""")
-                .param(SampleDataImporter.USER).query(Long.class).single()).isEqualTo(2);
+                        SELECT COUNT(*) FROM watch_progress p JOIN app_user u ON u.id = p.user_id WHERE u.username = ? AND p.finished = 0""")
+                .param(SampleDataImporter.USER).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbcClient.sql("""
+                        SELECT COUNT(*) FROM watch_progress p JOIN app_user u ON u.id = p.user_id WHERE u.username = ? AND p.finished = 1""")
+                .param(SampleDataImporter.USER).query(Long.class).single()).isGreaterThan(1);
+        assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video_rating").query(Long.class).single()).isPositive();
+        assertThat(jdbcClient.sql("SELECT COUNT(*) FROM playlist_item").query(Long.class).single()).isPositive();
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM audit_entry").query(Long.class).single()).isEqualTo(8);
     }
 }
