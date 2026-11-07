@@ -18,8 +18,10 @@ package nu.fgv.spexflix.server.user;
 
 import nu.fgv.spexflix.server.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @since 1.0
  */
 class AccessIntegrationTest extends AbstractIntegrationTest {
+
+    @Test
+    void anIdTokenIsRefusedInPlaceOfAnAccessToken() {
+        final int status = http().post().uri("/api/graphql")
+                .header(HttpHeaders.AUTHORIZATION, idToken(EDITOR))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"query\": \"{ me { username } }\"}")
+                .exchange((request, response) -> response.getStatusCode().value());
+
+        assertThat(status).isEqualTo(401);
+    }
 
     @Test
     void meListsTheCallersRoles() {

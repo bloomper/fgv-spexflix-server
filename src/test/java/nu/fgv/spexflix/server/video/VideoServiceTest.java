@@ -42,6 +42,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.unit.DataSize;
 
 import java.nio.file.Files;
@@ -323,6 +325,95 @@ class VideoServiceTest {
         assertThat(service.setFile(uuid(1), "u-2").status()).isEqualTo(VideoStatus.READY);
         assertThat(storage.originals(ready).resolve("pending-" + NOW.toEpochMilli() + ".mov")).exists();
         verify(auditService).record("REPLACE", "VIDEO", uuid(1), "Bytte filen för Cleopatra");
+    }
+
+    @Test
+    void aRolledBackFileGoesBackToItsUploadAndTheOriginalStays() throws Exception {
+        as(TestCallers.editor());
+        waiting.setStatus(VideoStatus.FAILED);
+        waiting.setOriginalExtension("mkv");
+        Files.createDirectories(storage.originals(waiting));
+
+        final Path original = Files.write(storage.original(waiting), new byte[]{9});
+        final Path upload = Files.write(root.resolve("upload"), new byte[]{1, 2});
+
+        when(uploadService.claim("u-1", TestCallers.editor())).thenReturn(upload);
+        when(uploadService.fileName("u-1")).thenReturn("ny.mkv");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.setFile(uuid(2), "u-1");
+            // Until the commit, the old original is set aside, not deleted
+            assertThat(original).hasBinaryContent(new byte[]{1, 2});
+            complete(TransactionSynchronization.STATUS_ROLLED_BACK);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(original).hasBinaryContent(new byte[]{9});
+        assertThat(upload).hasBinaryContent(new byte[]{1, 2});
+        try (var files = Files.list(storage.originals(waiting))) {
+            assertThat(files).containsExactly(original);
+        }
+    }
+
+    @Test
+    void aCommittedFileReplacesTheOriginalItWasSetAsideFor() throws Exception {
+        as(TestCallers.editor());
+        waiting.setStatus(VideoStatus.FAILED);
+        waiting.setOriginalExtension("mp4");
+        Files.createDirectories(storage.originals(waiting));
+
+        final Path original = Files.write(storage.original(waiting), new byte[]{9});
+        final Path upload = Files.write(root.resolve("upload"), new byte[]{1, 2});
+
+        when(uploadService.claim("u-1", TestCallers.editor())).thenReturn(upload);
+        when(uploadService.fileName("u-1")).thenReturn("ny.mkv");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.setFile(uuid(2), "u-1");
+            complete(TransactionSynchronization.STATUS_COMMITTED);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(original).doesNotExist();
+        assertThat(upload).doesNotExist();
+        try (var files = Files.list(storage.originals(waiting))) {
+            assertThat(files).containsExactly(storage.original(waiting));
+        }
+        assertThat(storage.original(waiting)).hasBinaryContent(new byte[]{1, 2});
+    }
+
+    @Test
+    void aRolledBackReplacementGoesBackToItsUpload() throws Exception {
+        as(TestCallers.editor());
+        ready.setOriginalExtension("mp4");
+        Files.createDirectories(storage.originals(ready));
+
+        final Path original = Files.write(storage.original(ready), new byte[]{9});
+        final Path upload = Files.write(root.resolve("upload"), new byte[]{4});
+
+        when(uploadService.claim("u-2", TestCallers.editor())).thenReturn(upload);
+        when(uploadService.fileName("u-2")).thenReturn("ny.mov");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.setFile(uuid(1), "u-2");
+            complete(TransactionSynchronization.STATUS_ROLLED_BACK);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(upload).hasBinaryContent(new byte[]{4});
+        try (var files = Files.list(storage.originals(ready))) {
+            assertThat(files).containsExactly(original);
+        }
+    }
+
+    private static void complete(final int status) {
+        TransactionSynchronizationManager.getSynchronizations().forEach(synchronization -> synchronization.afterCompletion(status));
     }
 
     @Test

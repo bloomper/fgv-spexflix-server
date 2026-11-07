@@ -38,6 +38,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
@@ -306,9 +308,16 @@ public class VideoService {
 
         try {
             Files.createDirectories(storage.originals(video));
+
+            final long size = Files.size(upload);
+            Path previous = null;
+            Path aside = null;
+
             if (first) {
-                if (video.getOriginalExtension() != null) {
-                    Files.deleteIfExists(storage.original(video));
+                if (video.getOriginalExtension() != null && Files.exists(storage.original(video))) {
+                    // Set aside, not deleted, until the transaction has committed
+                    previous = storage.original(video);
+                    aside = storage.originals(video).resolve("replaced-" + clock.millis() + "." + video.getOriginalExtension());
                 }
                 video.setOriginalExtension(extension);
                 target = storage.original(video);
@@ -316,9 +325,20 @@ public class VideoService {
                 target = storage.originals(video).resolve("pending-" + clock.millis() + "." + extension);
             }
             video.setOriginalName(limit(name.isEmpty() ? "video." + extension : name));
-            video.setOriginalSize(Files.size(upload));
+            video.setOriginalSize(size);
             video.setOriginalKept(true);
-            Files.move(upload, target, StandardCopyOption.REPLACE_EXISTING);
+            if (previous != null) {
+                Files.move(previous, aside, StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(upload, target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (final IOException e) {
+                if (previous != null) {
+                    Files.move(aside, previous, StandardCopyOption.REPLACE_EXISTING);
+                }
+                throw e;
+            }
+            settleOnCompletion(upload, target, previous, aside);
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -334,6 +354,48 @@ public class VideoService {
         auditService.record(first ? "UPLOAD" : "REPLACE", "VIDEO", video.getUuid(),
                 (first ? "Laddade upp filen till " : "Bytte filen för ") + video.getTitle());
         return VideoDtos.toDto(video);
+    }
+
+    /**
+     * Settles a file taken from an upload once the transaction completes. On a commit the original it replaced, set
+     * aside, is deleted; on a rollback the file goes back to its upload, whose session the rollback keeps, and the
+     * original back in its place.
+     */
+    static void settleOnCompletion(final Path upload, final Path target, final @Nullable Path previous,
+                                   final @Nullable Path aside) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            if (aside != null) {
+                deleteQuietly(aside);
+            }
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(final int status) {
+                if (status == STATUS_COMMITTED) {
+                    if (aside != null) {
+                        deleteQuietly(aside);
+                    }
+                    return;
+                }
+                try {
+                    Files.move(target, upload, StandardCopyOption.REPLACE_EXISTING);
+                    if (previous != null && aside != null) {
+                        Files.move(aside, previous, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (final IOException | RuntimeException e) {
+                    log.warn("Could not undo taking an upload as a video file: {}", e.getMessage());
+                }
+            }
+        });
+    }
+
+    private static void deleteQuietly(final Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (final IOException e) {
+            log.warn("Could not delete {}", path, e);
+        }
     }
 
     @Transactional

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,9 +79,10 @@ public class ProcessingService {
     public Map<UUID, JobDto> latest(final Collection<UUID> videoIds) {
         final Map<UUID, JobDto> jobs = new HashMap<>();
 
-        if (callerService.currentIfAny().map(caller -> caller.isEditor()).orElse(false)) {
-            videoRepository.findByUuidIn(videoIds).forEach(video -> jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(video.getId())
-                    .ifPresent(job -> jobs.put(video.getUuid(), toDto(job))));
+        if (!videoIds.isEmpty() && callerService.currentIfAny().map(caller -> caller.isEditor()).orElse(false)) {
+            jobRepository.findLatestByVideoUuidIn(videoIds).stream()
+                    .sorted(Comparator.comparing(ProcessingJob::getId))
+                    .forEach(job -> jobs.put(job.getVideo().getUuid(), toDto(job)));
         }
         return jobs;
     }

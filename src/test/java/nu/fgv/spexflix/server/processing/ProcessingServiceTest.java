@@ -34,12 +34,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -99,11 +102,19 @@ class ProcessingServiceTest {
 
         when(callerService.currentIfAny()).thenReturn(Optional.of(TestCallers.editor()));
         final ProcessingJob first = job(1L, null);
-        final ProcessingJob second = job(2L, null);
 
-        when(videoRepository.findByUuidIn(List.of(uuid(1), uuid(2)))).thenReturn(List.of(first.getVideo(), second.getVideo()));
-        when(jobRepository.findFirstByVideoIdOrderByCreatedAtDesc(1L)).thenReturn(Optional.of(first));
-        assertThat(service.latest(List.of(uuid(1), uuid(2)))).containsOnlyKeys(uuid(1));
+        // Two jobs of the first video created at the same instant: the later one is the latest
+        final ProcessingJob again = job(3L, null);
+
+        again.setVideo(first.getVideo());
+        // One query for all the videos, not one per video
+        when(jobRepository.findLatestByVideoUuidIn(List.of(uuid(1), uuid(2)))).thenReturn(List.of(again, first));
+
+        final Map<UUID, ProcessingService.JobDto> latest = service.latest(List.of(uuid(1), uuid(2)));
+
+        assertThat(latest).containsOnlyKeys(uuid(1));
+        assertThat(latest.get(uuid(1)).id()).isEqualTo(3L);
+        verifyNoInteractions(videoRepository);
     }
 
     @Test
