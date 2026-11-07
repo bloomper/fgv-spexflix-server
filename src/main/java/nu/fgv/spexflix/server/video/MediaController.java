@@ -52,6 +52,10 @@ import java.util.regex.Pattern;
 @RestController
 public class MediaController {
 
+    /**
+     * For images, which editors upload: rendered as nothing else, and sandboxed should a browser open one as a page.
+     */
+    static final String IMAGE_CONTENT_SECURITY_POLICY = "sandbox; default-src 'none'";
     private static final long MAX_IMAGE = 10L * 1024 * 1024;
     private static final long MAX_SUBTITLE = 2L * 1024 * 1024;
     private static final Pattern SRT_TIME = Pattern.compile("(\\d{2}:\\d{2}:\\d{2}),(\\d{3})");
@@ -114,6 +118,9 @@ public class MediaController {
             return ResponseEntity.ok()
                     .contentType(Objects.requireNonNullElse(imageType(head(file)), MediaType.IMAGE_JPEG))
                     .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                    // Uploaded by an editor: never sniffed as anything but an image, nor run as a page
+                    .header("X-Content-Type-Options", "nosniff")
+                    .header("Content-Security-Policy", IMAGE_CONTENT_SECURITY_POLICY)
                     .body(new FileSystemResource(file));
         }
         if (video.mainSpex() != null) {
@@ -121,6 +128,8 @@ public class MediaController {
                     .<ResponseEntity<?>>map(poster -> ResponseEntity.ok()
                             .contentType(MediaType.parseMediaType(poster.contentType()))
                             .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                            .header("X-Content-Type-Options", "nosniff")
+                            .header("Content-Security-Policy", IMAGE_CONTENT_SECURITY_POLICY)
                             .body(poster.content()))
                     .orElseGet(() -> ResponseEntity.notFound().build());
         }

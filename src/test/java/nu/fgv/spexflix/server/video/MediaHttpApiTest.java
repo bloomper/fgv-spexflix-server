@@ -116,13 +116,17 @@ class MediaHttpApiTest extends AbstractApiTest {
                 .perform(get("/api/videos/{id}/poster", uuid(1)).header(HttpHeaders.AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Content-Security-Policy", "sandbox; default-src 'none'"))
                 .andDo(document(
                         "video-poster-get",
                         videoId,
                         secureRequestHeaders,
                         responseHeaders(
                                 headerWithName(HttpHeaders.CONTENT_TYPE).description("The image's type"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL).description("Private, for an hour")
+                                headerWithName(HttpHeaders.CACHE_CONTROL).description("Private, for an hour"),
+                                headerWithName("X-Content-Type-Options").description("`nosniff`: the image is never taken for anything else"),
+                                headerWithName("Content-Security-Policy").description("Sandboxed, should a browser open the image as a page")
                         ),
                         security(List.of("USER"))
                 ));
@@ -199,7 +203,9 @@ class MediaHttpApiTest extends AbstractApiTest {
         spex.setId(uuid(7));
         video.getSpex().add(spex);
         when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexregisterClient.Poster(JPEG, "image/jpeg")));
-        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"));
+        mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Content-Security-Policy", "sandbox; default-src 'none'"));
 
         when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.empty());
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isNotFound());

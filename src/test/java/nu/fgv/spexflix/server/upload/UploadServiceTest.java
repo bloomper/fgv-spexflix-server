@@ -22,6 +22,8 @@ import nu.fgv.spexflix.server.config.SpexflixProperties;
 import nu.fgv.spexflix.server.processing.MediaStorage;
 import nu.fgv.spexflix.server.settings.Settings;
 import nu.fgv.spexflix.server.settings.SettingsService;
+import nu.fgv.spexflix.server.user.Caller;
+import nu.fgv.spexflix.server.user.Role;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
 import nu.fgv.spexflix.server.util.error.ResourceNotFoundException;
@@ -43,6 +45,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -147,6 +153,66 @@ class UploadServiceTest {
         assertThatThrownBy(() -> service.get(TestCallers.admin(), session.getId())).isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> service.terminate(TestCallers.admin(), session.getId())).isInstanceOf(ResourceNotFoundException.class);
         assertThat(service.get(TestCallers.editor(), session.getId())).isSameAs(session);
+    }
+
+    @Test
+    void onlyAnEditorGoesOnWithTheirUpload() throws Exception {
+        final UploadSession session = service.create(TestCallers.editor(), 2, "a.mkv");
+        // The same person after losing EDITOR
+        final Caller demoted = new Caller(TestCallers.editor().subject(), "erik@spexflix.test", "Erik", Set.of(Role.USER), false);
+
+        assertThatThrownBy(() -> service.get(demoted, session.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.append(demoted, session.getId(), 0, new ByteArrayInputStream(new byte[]{1})))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.claim(session.getId(), demoted)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.terminate(demoted, session.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThat(session.getOffset()).isZero();
+    }
+
+    @Test
+    void anUploadIsNotTerminatedWhileAChunkIsBeingAppended() throws Exception {
+        final UploadSession session = service.create(TestCallers.editor(), 2, "a.mkv");
+        final CountDownLatch reading = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        final java.io.InputStream body = new java.io.InputStream() {
+            private boolean sent;
+
+            @Override
+            public int read() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int read(final byte[] buffer, final int offset, final int length) throws java.io.IOException {
+                if (sent) {
+                    return -1;
+                }
+                reading.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (final InterruptedException e) {
+                    throw new java.io.IOException(e);
+                }
+                buffer[offset] = 1;
+                sent = true;
+                return 1;
+            }
+        };
+        final CompletableFuture<Long> append = CompletableFuture.supplyAsync(() -> {
+            try {
+                return service.append(TestCallers.editor(), session.getId(), 0, body);
+            } catch (final java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+
+        assertThat(reading.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThatThrownBy(() -> service.terminate(TestCallers.editor(), session.getId())).isInstanceOf(ConflictException.class);
+        release.countDown();
+        assertThat(append.get(5, TimeUnit.SECONDS)).isEqualTo(1);
+
+        service.terminate(TestCallers.editor(), session.getId());
+        verify(repository).delete(session);
     }
 
     @Test

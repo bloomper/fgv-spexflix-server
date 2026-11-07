@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repository for {@link ProcessingJob}.
@@ -40,7 +41,14 @@ public interface ProcessingJobRepository extends JpaRepository<ProcessingJob, Lo
     @Query("SELECT j FROM ProcessingJob j JOIN FETCH j.video ORDER BY j.createdAt DESC")
     List<ProcessingJob> findRecent(Pageable pageable);
 
-    Optional<ProcessingJob> findFirstByVideoIdOrderByCreatedAtDesc(Long videoId);
+    /**
+     * The latest job of each of some videos, in one query; two jobs of a video created at the same instant both come.
+     */
+    @Query("""
+            SELECT j FROM ProcessingJob j JOIN FETCH j.video v
+            WHERE v.uuid IN :videoIds
+              AND j.createdAt = (SELECT MAX(k.createdAt) FROM ProcessingJob k WHERE k.video = v)""")
+    List<ProcessingJob> findLatestByVideoUuidIn(Collection<UUID> videoIds);
 
     boolean existsByVideoIdAndStatusIn(Long videoId, Collection<JobStatus> statuses);
 }
