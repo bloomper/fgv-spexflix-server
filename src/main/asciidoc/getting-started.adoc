@@ -39,12 +39,12 @@ $ git clone https://github.com/bloomper/fgv-spexflix-server
 === Shared infrastructure
 
 Keycloak (with the realm ``fgv``), Mailpit, Umami and Caddy, which FGV's applications share, run in the local stack of https://github.com/bloomper/fgv-infra-deploy[fgv-infra-deploy].
-Check it out next to this repository and start it once; it keeps running for every application:
+Check it out two levels up (``../../fgv-infra-deploy`` from this repository) and start it once; it keeps running for every application:
 
 [source,bash]
 ----
-$ git clone https://github.com/bloomper/fgv-infra-deploy ../fgv-infra-deploy
-$ cd ../fgv-infra-deploy/local
+$ git clone https://github.com/bloomper/fgv-infra-deploy ../../fgv-infra-deploy
+$ cd ../../fgv-infra-deploy/local
 $ printf '%s' 'verysecret' > .docker/secrets/KEYCLOAK_MYSQL_ROOT_PASSWORD
 $ printf '%s' 'secret' > .docker/secrets/KEYCLOAK_MYSQL_USER_PASSWORD
 $ printf '%s' 'password' > .docker/secrets/KEYCLOAK_ADMIN_PASSWORD   # for the user KEYCLOAK_ADMIN in local/.env
@@ -132,7 +132,7 @@ You are now ready to get Spexflix Server up and running, after fgv-infra-deploy'
 
 [source,bash]
 ----
-$ docker compose -f ../fgv-infra-deploy/local/compose.yaml up -d
+$ docker compose -f ../../fgv-infra-deploy/local/compose.yaml up -d
 $ docker compose up -d
 ----
 
@@ -157,7 +157,7 @@ ffmpeg and ffprobe must be on the path.
 The realm lets a locally running https://github.com/bloomper/fgv-spexflix-web[fgv-spexflix-web], i.e. ``npm run dev``, log in from ``SPEXFLIX_URL`` in fgv-infra-deploy's ``local/.env``, which defaults to ``http://localhost:3003``.
 
 ``./scripts/configure-keycloak.sh`` copies the secrets of the Keycloak clients the API uses from the local Keycloak into ``.docker/secrets``, sets the web client's id and secret (``KEYCLOAK_CLIENT_ID``, ``KEYCLOAK_CLIENT_SECRET``) in the ``.env.local`` of the web's checkout next to this one (or where ``WEB_DIR`` points), and allows Postman's callback URL in Keycloak (see <<testing_the_api>>).
-It finds fgv-infra-deploy in ``../fgv-infra-deploy``, or where ``INFRA_DEPLOY`` points.
+It finds fgv-infra-deploy in ``../../fgv-infra-deploy``, or where ``INFRA_DEPLOY`` points.
 
 The same setup for staging and production is in https://github.com/bloomper/fgv-spexflix-deploy[fgv-spexflix-deploy] and fgv-infra-deploy.
 
@@ -207,8 +207,8 @@ The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the 
 The realm is defined by ``realm/fgv.json`` in fgv-keycloak, whose README describes what it contains.
 Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-service`` (calls to Spexregister and Spexify) and ``fgv-admin`` (the sample data's users).
 
-The integration tests import a copy of ``fgv.json``.
-Refresh it with ``./gradlew syncRealm`` from a sibling ``fgv-keycloak`` checkout after every realm change, and commit it.
+The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
+After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
 
 To get a changed ``fgv.json`` into the local Keycloak, run ``docker compose down`` in fgv-infra-deploy's ``local``, empty ``local/.docker/keycloak-mysql/data`` and start it again.
 
