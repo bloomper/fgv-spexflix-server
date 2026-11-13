@@ -15,7 +15,7 @@
  */
 
 /**
- * Spex from Spexregister, which videos are linked to.
+ * Spex from Spexipedia, which videos are linked to, and its change feed.
  */
 @NullMarked
 package nu.fgv.spexflix.server.spex;

@@ -72,7 +72,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * MySQL and Keycloak (with the committed copy of {@code fgv-keycloak}'s realm plus fictitious users) in Testcontainers,
- * and WireMock standing in for Spexregister's and Spexify's GraphQL APIs. The worker runs in the application, so
+ * and WireMock standing in for Spexipedia's and Spexify's GraphQL APIs. The worker runs in the application, so
  * uploads are processed for real with ffmpeg. Every test starts from empty tables and an empty media folder.
  *
  * @author Anders Jacobsson
@@ -92,7 +92,7 @@ public abstract class AbstractIntegrationTest {
     protected static final String CLIENT_ID = "fgv-spexflix";
     protected static final String SPEXIFY_SERVICE_CLIENT_ID = "fgv-spexify-service";
     protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
-    protected static final WireMockServer SPEXREGISTER = new WireMockServer(options().dynamicPort());
+    protected static final WireMockServer SPEXIPEDIA = new WireMockServer(options().dynamicPort());
     protected static final WireMockServer SPEXIFY = new WireMockServer(options().dynamicPort());
     protected static final Path MEDIA = Path.of("build/integrationtest-data/media").toAbsolutePath();
     private static final String REALM = "fgv";
@@ -107,7 +107,7 @@ public abstract class AbstractIntegrationTest {
 
     static {
         Startables.deepStart(MYSQL, KEYCLOAK).join();
-        SPEXREGISTER.start();
+        SPEXIPEDIA.start();
         SPEXIFY.start();
         prepareKeycloak();
     }
@@ -130,7 +130,9 @@ public abstract class AbstractIntegrationTest {
         registry.add("spexflix.keycloak.url", KEYCLOAK::getAuthServerUrl);
         registry.add("spexflix.keycloak.admin-client-secret", () -> SECRETS.get("fgv-admin"));
         registry.add("spexflix.media.root", MEDIA::toString);
-        registry.add("spexflix.spexregister.graphql-url", () -> SPEXREGISTER.baseUrl() + "/api/graphql");
+        registry.add("spexflix.spexipedia.graphql-url", () -> SPEXIPEDIA.baseUrl() + "/api/graphql");
+        // Tests pull the feed themselves
+        registry.add("spexflix.spexipedia.sync-enabled", () -> "false");
         registry.add("spexflix.spexify.graphql-url", () -> SPEXIFY.baseUrl() + "/api/graphql");
     }
 
@@ -247,9 +249,15 @@ public abstract class AbstractIntegrationTest {
      * Spexify's service account's access token, by client credentials.
      */
     protected static String spexifyServiceToken() {
-        return TOKENS.computeIfAbsent(SPEXIFY_SERVICE_CLIENT_ID, _ -> requestToken(Map.of(
-                "grant_type", "client_credentials", "client_id", SPEXIFY_SERVICE_CLIENT_ID,
-                "client_secret", SECRETS.get(SPEXIFY_SERVICE_CLIENT_ID))));
+        return serviceToken(SPEXIFY_SERVICE_CLIENT_ID);
+    }
+
+    /**
+     * A service account's access token, by client credentials, e.g. {@code fgv-spexipedia-service}.
+     */
+    protected static String serviceToken(final String clientId) {
+        return TOKENS.computeIfAbsent(clientId, _ -> requestToken(Map.of(
+                "grant_type", "client_credentials", "client_id", clientId, "client_secret", SECRETS.get(clientId))));
     }
 
     /**
@@ -291,20 +299,21 @@ public abstract class AbstractIntegrationTest {
     }
 
     /**
-     * Spexregister answering with spex {@value #SPEX_ID}, Cleopatra 2024.
+     * Spexipedia answering with spex {@value #SPEX_ID}, Cleopatra 2024.
      */
-    protected static void spexregisterUp() {
-        SPEXREGISTER.resetAll();
-        SPEXREGISTER.stubFor(post(urlEqualTo("/api/graphql"))
+    protected static void spexipediaUp() {
+        SPEXIPEDIA.resetAll();
+        SPEXIPEDIA.stubFor(post(urlEqualTo("/api/graphql"))
                 .withRequestBody(containing("SpexById"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null,
+                        {"data": {"spex": {"id": "00000000-0000-7000-8000-000000000001", "year": "2024", "title": "Cleopatra", "revival": false,
+                                           "retired": false, "parent": null, "poster": null,
                                            "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}}}""")));
     }
 
-    protected static void spexregisterDown() {
-        SPEXREGISTER.resetAll();
-        SPEXREGISTER.stubFor(post(urlEqualTo("/api/graphql")).willReturn(aResponse().withStatus(503)));
+    protected static void spexipediaDown() {
+        SPEXIPEDIA.resetAll();
+        SPEXIPEDIA.stubFor(post(urlEqualTo("/api/graphql")).willReturn(aResponse().withStatus(503)));
     }
 
     /**
@@ -323,7 +332,7 @@ public abstract class AbstractIntegrationTest {
     void resetState() throws IOException {
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
         for (final String table : List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
-                "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock")) {
+                "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock", "spexipedia_category")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 1").update();
@@ -340,7 +349,7 @@ public abstract class AbstractIntegrationTest {
         jdbcClient.sql("DELETE FROM settings").update();
         storage.wipe();
         cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
-        spexregisterUp();
+        spexipediaUp();
         spexifyUp();
     }
 

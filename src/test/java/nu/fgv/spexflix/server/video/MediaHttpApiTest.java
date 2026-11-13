@@ -202,7 +202,7 @@ class MediaHttpApiTest extends AbstractApiTest {
 
         spex.setId(uuid(7));
         video.getSpex().add(spex);
-        when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexregisterClient.Poster(JPEG, "image/jpeg")));
+        when(spexService.poster(uuid(7))).thenReturn(java.util.Optional.of(new nu.fgv.spexflix.server.spex.SpexipediaClient.Poster(JPEG, "image/jpeg")));
         mockMvc.perform(get("/api/videos/{id}/poster", uuid(1))).andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Content-Security-Policy", "sandbox; default-src 'none'"));

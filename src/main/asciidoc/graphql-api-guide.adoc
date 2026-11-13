@@ -33,7 +33,7 @@ The GraphQL API provides the error code in ``extensions.classification`` and a m
 |``NOT_FOUND``|The resource does not exist. Also returned for a video the user may not see.
 |``BAD_REQUEST``|The input breaks a rule, e.g. playing a video that is not ready.
 |``CONFLICT``|Someone else changed the resource since the user read it. Ask them to reload.
-|``SPEXREGISTER_UNAVAILABLE``|Spexregister cannot be reached. Everything that does not need it keeps working.
+|``SPEXIPEDIA_UNAVAILABLE``|Spexipedia cannot be reached. Everything that does not need it keeps working.
 |``DIRECTORY_UNAVAILABLE``|The FGV realm's users cannot be read in Keycloak.
 
 |===
@@ -87,8 +87,8 @@ Every service method resolves the caller and checks the role before it acts; Gra
 [[videos]]
 == Videos and processing
 
-A video is usually about one spex in Spexregister, but can be about several, e.g. a jubilee show, or none (``Video.spex`` is a list, the main spex first: the poster, the default title and year, and the category come from it).
-A revival is a spex of its own in Spexregister; each linked spex keeps its original (``VideoSpex.familyId``), so filtering on an original (``VideoFilter.spexId``) also gives the videos of its revivals, and ``spexSearch`` lists revivals right after their original.
+A video is usually about one spex in Spexipedia, but can be about several, e.g. a jubilee show, or none (``Video.spex`` is a list, the main spex first: the poster, the default title and year, and the category come from it).
+A revival is a spex of its own in Spexipedia; each linked spex keeps its original (``VideoSpex.familyId``), so filtering on an original (``VideoFilter.spexId``) also gives the videos of its revivals, and ``spexSearch`` lists revivals right after their original.
 A video starts unpublished, waiting for its file.
 Its file is uploaded with tus (see the xref:api-guide.adoc[HTTP API]) and given to ``videoSetFile``, which queues it.
 
@@ -148,11 +148,14 @@ Editors' changes are recorded in the audit log (``auditLog``): who, when, what a
 Editors see their own changes, admins everyone's.
 ``AuditFilter`` narrows the log by kind of record, action, person (admins only), period, text in the summary or one record (``entityId``); ``auditActors`` lists the people in the log the caller may see.
 
-[[spexregister]]
-== Spexregister
+[[spexipedia]]
+== Spexipedia
 
-Spex, their categories and posters are read from Spexregister, which Spexflix Server calls as the service account ``fgv-spexflix-service`` with Spexregister's ``MEDIA`` role.
-A video keeps a copy of its spex's title and year, so the catalogue works while Spexregister is down; only ``spexSearch`` and posters fail, with ``SPEXREGISTER_UNAVAILABLE``.
+Spex, their categories and posters are read from Spexipedia, FGV's source of base data, which Spexflix Server calls as the service account ``fgv-spexflix-service``.
+A video keeps a copy of its spex's title, year and category, so the catalogue works while Spexipedia is down; only ``spexSearch`` and posters fail, with ``SPEXIPEDIA_UNAVAILABLE``.
+The copies follow Spexipedia's change feed (``SYNC`` on ``fgv-spexipedia``): Spexflix pulls it every five minutes and when Spexipedia calls ``POST /api/sync/notify`` (``NOTIFY``); a merge in Spexipedia moves videos to the spex merged into.
+The maintenance job ``SPEX_REFRESH`` copies everything again every night.
+Spexipedia's service account reads which published videos are about given spex (``spexipediaVideos``, ``SPEXIPEDIA``), for its links to Spexflix.
 
 [[spexify]]
 == Spexify

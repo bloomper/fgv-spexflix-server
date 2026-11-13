@@ -75,6 +75,8 @@ spexflix:
   jobs:
     spex-refresh:
       cron-expression: 0 15 3 * * * # Every day at 03:15
+    spexipedia-sync:
+      cron-expression: 0 */5 * * * * # Every five minutes
     upload-cleanup:
       cron-expression: 0 5 * * * * # Every hour at :05
   keycloak:
@@ -84,7 +86,7 @@ spexflix:
     admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
     admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
   security:
-    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service}
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service,fgv-spexipedia-service}
   media:
     root: ${API_MEDIA_ROOT:./data/media}
     max-upload-size: ${API_MAX_UPLOAD_SIZE:50GB}
@@ -96,8 +98,10 @@ spexflix:
   worker:
     enabled: ${API_WORKER_ENABLED:false}
     priority: 10
-  spexregister:
-    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  spexipedia:
+    graphql-url: ${API_SPEXIPEDIA_GRAPHQL_URL:https://api.spexipedia.fgv.local.nu:8443/api/graphql}
+    web-url: ${SPEXIPEDIA_WEB_URL:}
+    sync-enabled: ${API_SPEXIPEDIA_SYNC_ENABLED:true}
   spexify:
     graphql-url: ${API_SPEXIFY_GRAPHQL_URL:}
   data:

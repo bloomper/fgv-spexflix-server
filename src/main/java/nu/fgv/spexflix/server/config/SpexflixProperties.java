@@ -35,7 +35,7 @@ public record SpexflixProperties(String timeZone,
                                  Security security,
                                  Media media,
                                  Worker worker,
-                                 Spexregister spexregister,
+                                 Spexipedia spexipedia,
                                  Spexify spexify,
                                  Data data) {
 
@@ -62,7 +62,12 @@ public record SpexflixProperties(String timeZone,
     public record Worker(boolean enabled, int priority) {
     }
 
-    public record Spexregister(String graphqlUrl) {
+    /**
+     * @param graphqlUrl  Spexipedia's GraphQL API, e.g. {@code http://spexipedia-api:8080/api/graphql}
+     * @param webUrl      Spexipedia's web, for links to its pages; empty for none
+     * @param syncEnabled whether to follow its change feed
+     */
+    public record Spexipedia(String graphqlUrl, String webUrl, boolean syncEnabled) {
     }
 
     public record Spexify(String graphqlUrl) {

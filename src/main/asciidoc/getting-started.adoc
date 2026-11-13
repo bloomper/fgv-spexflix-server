@@ -55,8 +55,8 @@ $ docker compose up -d
 It creates the Docker network ``fgv-local``, which this repository's ``docker-compose.yaml`` joins.
 Keycloak imports the realm, with its clients and their secrets, from ``realm/fgv.json`` in https://github.com/bloomper/fgv-keycloak[fgv-keycloak].
 
-Spexflix reads spex from Spexregister, and its sample data is built on Spexregister's (see <<sample_data>>).
-Run https://github.com/bloomper/spexregister-server[spexregister-server]'s local stack as well, as its getting started guide describes.
+Spexflix reads spex from Spexipedia, and its sample data is built on Spexipedia's spex and Spexregister's users (see <<sample_data>>).
+Run the local stacks of fgv-spexipedia-server and https://github.com/bloomper/spexregister-server[spexregister-server] as well, as their getting started guides describe.
 
 [[configuration]]
 === Configuration
@@ -83,7 +83,7 @@ To see a changed placeholder after a pull, undo it with ``git update-index --no-
 
 |FGV_SPEXFLIX_MYSQL_ROOT_PASSWORD|The password for the root user of Spexflix Server's database||verysecret
 |FGV_SPEXFLIX_MYSQL_USER_PASSWORD|The password for the user of Spexflix Server's database||secret
-|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexflix-service``, with which Spexflix Server calls Spexregister and Spexify|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexflix-service`` and pick the value for ``secret`` in the same section|
+|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexflix-service``, with which Spexflix Server calls Spexipedia and Spexify|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexflix-service`` and pick the value for ``secret`` in the same section|
 |API_KEYCLOAK_ADMIN_CLIENT_SECRET|The client secret of ``fgv-admin``, with which the sample data import gives users roles|Must match the value in ``realm/fgv.json``, search for ``fgv-admin``|
 |API_MEDIA_SIGNING_KEY|Signs the playback addresses, which the media server checks; shared by ``spexflix-api`` and ``spexflix-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 
@@ -136,7 +136,7 @@ $ docker compose -f ../../fgv-infra-deploy/local/compose.yaml up -d
 $ docker compose up -d
 ----
 
-This starts MySQL, the media server and ``spexflix-api``, which reaches Keycloak and Spexregister by their container names on the ``fgv-local`` network and, in the Spring profile ``local``, also runs the processing worker.
+This starts MySQL, the media server and ``spexflix-api``, which reaches Keycloak and Spexipedia by their container names on the ``fgv-local`` network and, in the Spring profile ``local``, also runs the processing worker.
 Caddy serves the API on ``https://api.spexflix.fgv.local.nu:8443`` and the media server on ``https://media.spexflix.fgv.local.nu:8443``.
 MySQL and the media server are also published on localhost, on ports 3309 and 8084.
 The media server's configuration is ``media/default.conf.template`` in a sibling https://github.com/bloomper/fgv-spexflix-deploy[fgv-spexflix-deploy] checkout, or where ``SPEXFLIX_DEPLOY`` points.
@@ -175,10 +175,10 @@ If ``API_IMPORT_SAMPLE_DATA`` is set to ``true``, the database is replaced and t
 None of the data can be traced to real individuals, i.e. no personally identifiable information (PII).
 The import needs the secret of ``fgv-admin``.
 
-The sample data is built on Spexregister's, so Spexregister must run with ``API_IMPORT_SAMPLE_DATA=true``:
+The sample data is built on Spexipedia's and Spexregister's, so both must run with ``API_IMPORT_SAMPLE_DATA=true``:
 
-* The albums belong to Spexregister's sample spex, read from its API.
-The import waits up to 5 minutes for Spexregister.
+* The albums belong to Spexipedia's sample spex, read from its API.
+The import waits up to 5 minutes for Spexipedia.
 * Spexregister's sample users get roles on ``fgv-spexflix`` (see <<test_credentials>>).
 The import refuses to run without them, which keeps it away from real environments.
 
@@ -205,7 +205,7 @@ The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the 
 === Setup
 
 The realm is defined by ``realm/fgv.json`` in fgv-keycloak, whose README describes what it contains.
-Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-service`` (calls to Spexregister and Spexify) and ``fgv-admin`` (the sample data's users).
+Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-service`` (calls to Spexipedia and Spexify) and ``fgv-admin`` (the sample data's users).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -242,7 +242,7 @@ There are two types of tests:
 Unit tests do not require any external dependencies, such as a database, and are therefore quicker to run; the processing tests run a real transcode with ffmpeg.
 Among them are the API tests, which are used to generate the xref:api-guide.adoc[HTTP API documentation].
 
-Integration tests start MySQL and Keycloak with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexregister and Spexify.
+Integration tests start MySQL and Keycloak with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexipedia and Spexify.
 The worker runs in the test application, so uploads are processed into HLS with ffmpeg for real.
 
 [source,bash]

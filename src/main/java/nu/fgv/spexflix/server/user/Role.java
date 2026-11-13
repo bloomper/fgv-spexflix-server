@@ -27,5 +27,13 @@ public enum Role {
     USER,
     EDITOR,
     ADMIN,
-    SPEXIFY
+    SPEXIFY,
+    /**
+     * Spexipedia's service account: what links to its spex.
+     */
+    SPEXIPEDIA,
+    /**
+     * Spexipedia's service account: telling the application that its change feed has something new.
+     */
+    NOTIFY
 }

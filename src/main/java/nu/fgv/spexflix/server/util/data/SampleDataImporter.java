@@ -40,7 +40,7 @@ import nu.fgv.spexflix.server.processing.ProcessingJobRepository;
 import nu.fgv.spexflix.server.processing.ProcessingWorker;
 import nu.fgv.spexflix.server.spex.SpexDto;
 import nu.fgv.spexflix.server.spex.SpexService;
-import nu.fgv.spexflix.server.spex.SpexregisterClient;
+import nu.fgv.spexflix.server.spex.SpexipediaClient;
 import nu.fgv.spexflix.server.spexify.SpexifyClient;
 import nu.fgv.spexflix.server.user.AppUser;
 import nu.fgv.spexflix.server.user.AppUserRepository;
@@ -117,8 +117,8 @@ public class SampleDataImporter {
     static final String USER = "user@fgv.nu";
     // The only user of the applications' own, shared by Spexify's and Spexflix's sample data: an account without access
     static final String NO_ACCESS = "no-access@fgv.nu";
-    private static final int SPEXREGISTER_ATTEMPTS = 30;
-    private static final Duration SPEXREGISTER_RETRY_INTERVAL = Duration.ofSeconds(10);
+    private static final int SPEXIPEDIA_ATTEMPTS = 30;
+    private static final Duration SPEXIPEDIA_RETRY_INTERVAL = Duration.ofSeconds(10);
     private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "playlist_item", "playlist", "video_like", "video_credit", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
             "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
     /** Sample cast and crew, with what they do or play; each show credits some of them. */
@@ -153,7 +153,7 @@ public class SampleDataImporter {
     private final Environment environment;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
-    private final SpexregisterClient spexregisterClient;
+    private final SpexipediaClient spexipediaClient;
     private final SpexService spexService;
     private final SpexifyClient spexifyClient;
     private final Keycloak keycloak;
@@ -175,7 +175,7 @@ public class SampleDataImporter {
 
     @SuppressWarnings("java:S107")
     public SampleDataImporter(final SpexflixProperties properties, final Environment environment, final JdbcTemplate jdbcTemplate,
-                              final TransactionTemplate transactionTemplate, final SpexregisterClient spexregisterClient,
+                              final TransactionTemplate transactionTemplate, final SpexipediaClient spexipediaClient,
                               final SpexService spexService, final SpexifyClient spexifyClient, final Keycloak keycloak,
                               final MediaStorage storage, final Ffmpeg ffmpeg, final ProcessingWorker worker,
                               final VideoRepository videoRepository, final VideoKindRepository videoKindRepository,
@@ -189,7 +189,7 @@ public class SampleDataImporter {
         this.environment = environment;
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
-        this.spexregisterClient = spexregisterClient;
+        this.spexipediaClient = spexipediaClient;
         this.spexService = spexService;
         this.spexifyClient = spexifyClient;
         this.keycloak = keycloak;
@@ -335,22 +335,22 @@ public class SampleDataImporter {
     private List<SpexDto> spexWithRetry() {
         for (int attempt = 1; ; attempt++) {
             try {
-                final List<SpexDto> spex = spexregisterClient.allSpex();
+                final List<SpexDto> spex = spexipediaClient.allSpex().stream().filter(s -> !s.retired()).toList();
 
                 if (spex.isEmpty()) {
-                    throw new IllegalStateException("Spexregister has no spex; import its sample data first");
+                    throw new IllegalStateException("Spexipedia has no spex; import its sample data first");
                 }
                 return spex.stream().sorted(Comparator.comparing((SpexDto s) -> s.year() == null ? 0 : s.year())).toList();
-            } catch (final SpexregisterClient.SpexregisterCallException e) {
-                if (attempt == SPEXREGISTER_ATTEMPTS) {
-                    throw new IllegalStateException("Spexregister is unavailable, so sample data cannot be imported", e);
+            } catch (final SpexipediaClient.SpexipediaCallException e) {
+                if (attempt == SPEXIPEDIA_ATTEMPTS) {
+                    throw new IllegalStateException("Spexipedia is unavailable, so sample data cannot be imported", e);
                 }
-                log.info("Waiting for Spexregister ({}/{})", attempt, SPEXREGISTER_ATTEMPTS);
+                log.info("Waiting for Spexipedia ({}/{})", attempt, SPEXIPEDIA_ATTEMPTS);
                 try {
-                    Thread.sleep(SPEXREGISTER_RETRY_INTERVAL);
+                    Thread.sleep(SPEXIPEDIA_RETRY_INTERVAL);
                 } catch (final InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Interrupted while waiting for Spexregister", interrupted);
+                    throw new IllegalStateException("Interrupted while waiting for Spexipedia", interrupted);
                 }
             }
         }

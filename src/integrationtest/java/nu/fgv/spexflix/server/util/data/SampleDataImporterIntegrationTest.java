@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The sample data is built on Spexregister's: its spex, and its sample users, who get roles here. The only user of
+ * The sample data is built on Spexipedia's spex and Spexregister's sample users, who get roles here. The only user of
  * Spexflix's own is {@code no-access@fgv.nu}. The worker is off, so the queued jobs stay queued.
  *
  * @author Anders Jacobsson
@@ -45,30 +45,30 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private SampleDataImporter importer;
 
-    private static void spexregisterWithSpex() {
-        SPEXREGISTER.stubFor(post(urlEqualTo("/api/graphql")).withRequestBody(containing("AllSpex"))
+    private static void spexipediaWithSpex() {
+        SPEXIPEDIA.stubFor(post(urlEqualTo("/api/graphql")).withRequestBody(containing("AllSpex"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spexPaged": {"edges": [
-                            {"node": {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}},
-                            {"node": {"id": "00000000-0000-7000-8000-000000000002", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}}
-                        ]}}}""")));
+                        {"data": {"spexAll": [
+                            {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}},
+                            {"id": "00000000-0000-7000-8000-000000000002", "year": "2024", "title": "Cleopatra", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}
+                        ]}}""")));
     }
 
     @Test
     @Order(1)
     void refusesWithoutSpexregistersSampleUsers() {
-        spexregisterWithSpex();
+        spexipediaWithSpex();
 
         assertThatThrownBy(() -> importer.importSampleData()).hasMessageContaining("Spexregister's sample user");
     }
 
     @Test
     @Order(2)
-    void buildsVideosOnSpexregistersSpexAndGivesItsUsersRoles() throws Exception {
+    void buildsVideosOnSpexipediasSpexAndGivesItsUsersRoles() throws Exception {
         createSpexregisterUser(SampleDataImporter.ADMIN);
         createSpexregisterUser(SampleDataImporter.EDITOR);
         createSpexregisterUser(SampleDataImporter.USER);
-        spexregisterWithSpex();
+        spexipediaWithSpex();
 
         importer.importSampleData();
 

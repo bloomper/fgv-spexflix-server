@@ -19,7 +19,7 @@ package nu.fgv.spexflix.server.spexify;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.config.CacheConfig;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
-import nu.fgv.spexflix.server.config.SpexregisterClientConfig;
+import nu.fgv.spexflix.server.config.SpexipediaClientConfig;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
@@ -58,7 +58,7 @@ public class SpexifyClient {
 
     private final @Nullable HttpSyncGraphQlClient graphQlClient;
 
-    public SpexifyClient(final SpexflixProperties properties, final OAuth2AuthorizedClientManager spexregisterAuthorizedClientManager) {
+    public SpexifyClient(final SpexflixProperties properties, final OAuth2AuthorizedClientManager serviceAuthorizedClientManager) {
         final String url = properties.spexify().graphqlUrl();
 
         if (StringUtils.hasText(url)) {
@@ -66,8 +66,8 @@ public class SpexifyClient {
                     .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(HttpClientSettings.defaults()
                             .withConnectTimeout(TIMEOUT)
                             .withReadTimeout(TIMEOUT)))
-                    .requestInterceptor(new OAuth2ClientHttpRequestInterceptor(spexregisterAuthorizedClientManager))
-                    .defaultRequest(request -> request.attributes(clientRegistrationId(SpexregisterClientConfig.REGISTRATION_ID)))
+                    .requestInterceptor(new OAuth2ClientHttpRequestInterceptor(serviceAuthorizedClientManager))
+                    .defaultRequest(request -> request.attributes(clientRegistrationId(SpexipediaClientConfig.REGISTRATION_ID)))
                     .build();
 
             this.graphQlClient = HttpSyncGraphQlClient.builder(restClient).url(url).build();
