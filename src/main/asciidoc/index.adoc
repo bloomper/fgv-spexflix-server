@@ -25,6 +25,11 @@ Refer to the xref:graphql-api-guide.adoc[API guide].
 
 Refer to the xref:api-guide.adoc[API guide].
 
+[[mcp_server]]
+== MCP server
+
+Refer to the xref:getting-started.adoc#mcp_server[getting started guide].
+
 [[javadoc]]
 == Javadoc
 

@@ -91,6 +91,13 @@ public abstract class AbstractIntegrationTest {
     protected static final String PASSWORD = "s3cr3t-s3cr3t";
     protected static final String CLIENT_ID = "fgv-spexflix";
     protected static final String SPEXIFY_SERVICE_CLIENT_ID = "fgv-spexify-service";
+    protected static final String MCP_CLIENT_ID = "fgv-spexflix-mcp";
+    /**
+     * A public client that the MCP endpoint accepts as authorized party in the tests, but whose tokens lack its
+     * audience.
+     */
+    protected static final String UNBOUND_MCP_CLIENT_ID = "fgv-spexflix-mcp-unbound";
+    protected static final String MCP_PATH = "/api/mcp";
     protected static final String SPEX_ID = "00000000-0000-7000-8000-000000000001";
     protected static final WireMockServer SPEXIPEDIA = new WireMockServer(options().dynamicPort());
     protected static final WireMockServer SPEXIFY = new WireMockServer(options().dynamicPort());
@@ -161,6 +168,19 @@ public abstract class AbstractIntegrationTest {
 
             web.setDirectAccessGrantsEnabled(true);
             realm.clients().get(web.getId()).update(web);
+
+            final ClientRepresentation mcp = realm.clients().findByClientId(MCP_CLIENT_ID).getFirst();
+
+            mcp.setDirectAccessGrantsEnabled(true);
+            mcp.setConsentRequired(false);
+            realm.clients().get(mcp.getId()).update(mcp);
+
+            final ClientRepresentation unbound = new ClientRepresentation();
+
+            unbound.setClientId(UNBOUND_MCP_CLIENT_ID);
+            unbound.setPublicClient(true);
+            unbound.setDirectAccessGrantsEnabled(true);
+            realm.clients().create(unbound).close();
 
             createUser(realm, VIEWER, "Lisa", List.of("USER"));
             createUser(realm, EDITOR, "Erik", List.of("USER", "EDITOR"));
@@ -242,6 +262,21 @@ public abstract class AbstractIntegrationTest {
         return TOKENS.computeIfAbsent(CLIENT_ID + ":" + user, _ -> requestToken(Map.of(
                 "grant_type", "password", "client_id", CLIENT_ID, "client_secret", SECRETS.get(CLIENT_ID),
                 "username", user, "password", PASSWORD, "scope", "openid")));
+    }
+
+    /**
+     * A user's access token from a public client, e.g. {@value #MCP_CLIENT_ID}, by password grant.
+     */
+    protected static String publicClientToken(final String user, final String clientId) {
+        return TOKENS.computeIfAbsent(clientId + ":" + user, _ -> requestToken(Map.of(
+                "grant_type", "password", "client_id", clientId, "username", user, "password", PASSWORD, "scope", "openid")));
+    }
+
+    /**
+     * A user's access token from the MCP client {@value #MCP_CLIENT_ID}.
+     */
+    protected static String mcpToken(final String user) {
+        return publicClientToken(user, MCP_CLIENT_ID);
     }
 
     /**
@@ -331,10 +366,13 @@ public abstract class AbstractIntegrationTest {
     void resetState() throws IOException {
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
         for (final String table : List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
-                "chapter", "subtitle", "rendition", "video", "upload_session", "app_user", "shedlock", "spexipedia_category")) {
+                "chapter", "subtitle", "rendition", "playlist_item", "playlist", "video", "upload_session", "app_user", "spexipedia_category")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 1").update();
+        // Released rather than deleted: ShedLock remembers which lock rows it has made and only updates them after that,
+        // so a deleted row reads as a lock someone else holds and the job is skipped
+        jdbcClient.sql("UPDATE shedlock SET lock_until = UTC_TIMESTAMP(3)").update();
         // Back to the video kinds of the migration, which a test may have changed
         jdbcClient.sql("DELETE FROM video_kind").update();
         jdbcClient.sql("""

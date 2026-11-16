@@ -43,7 +43,10 @@ class SchedulerLockIntegrationTest extends AbstractIntegrationTest {
     @Test
     void cleanUpSkipsWhileAnotherContainerHoldsTheLock() {
         insertAbandonedUpload();
-        jdbcClient.sql("INSERT INTO shedlock (name, lock_until, locked_at, locked_by) VALUES (?, ?, ?, 'spexflix-worker')")
+        // The row may be there already, released, from an earlier run of the job
+        jdbcClient.sql("""
+                        INSERT INTO shedlock (name, lock_until, locked_at, locked_by) VALUES (?, ?, ?, 'spexflix-worker') AS held
+                        ON DUPLICATE KEY UPDATE lock_until = held.lock_until, locked_at = held.locked_at, locked_by = held.locked_by""")
                 .params(LOCK, Instant.now().plus(10, ChronoUnit.MINUTES), Instant.now())
                 .update();
 

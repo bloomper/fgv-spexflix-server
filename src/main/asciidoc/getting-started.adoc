@@ -103,10 +103,13 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 videos) or ``large`` (about 300)|small
 |API_SAMPLE_DATA_PREPROCESSED|A flag making the import process the sample videos itself, so they are ready when the API has started|false
 |SPEXFLIX_WEB_ORIGIN|The web origin the media server allows (CORS)|http://localhost:3003
+|API_BASE_URL|The API's public address; the MCP endpoint's address, the audience of MCP tokens, is this with ``/api/mcp``|https://api.spexflix.fgv.local.nu:8443
+|API_WEB_URL|Spexflix Web's address, for the links MCP tools return; empty for none|http://localhost:3003 (profile ``local``), else empty
+|API_KEYCLOAK_MCP_CLIENT_ID|The Keycloak client whose tokens the MCP endpoint accepts|fgv-spexflix-mcp
 
 |===
 
-Access tokens are only accepted from the Keycloak clients ``fgv-spexflix`` and ``fgv-spexify-service`` (``API_SECURITY_AUTHORIZED_PARTIES``).
+Access tokens are only accepted from the Keycloak clients ``fgv-spexflix`` and ``fgv-spexify-service`` (``API_SECURITY_AUTHORIZED_PARTIES``), and at the MCP endpoint only from ``fgv-spexflix-mcp`` (see <<mcp_server>>).
 
 Add the following to `/etc/hosts` (or the Windows equivalent):
 
@@ -196,7 +199,7 @@ The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the 
 === Setup
 
 The realm is defined by ``realm/fgv.json`` in fgv-keycloak, whose README describes what it contains.
-Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles) and ``fgv-spexflix-service`` (calls to Spexipedia and Spexify).
+Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-mcp`` (MCP clients) and ``fgv-spexflix-service`` (calls to Spexipedia and Spexify).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -287,5 +290,36 @@ Enter values as follows (leave other fields empty).
 
 Request an access token by clicking ``Get New Access Token`` and use any of the test credentials to login.
 Use the obtained access token when invoking the API, e.g. https://api.spexflix.fgv.local.nu:8443/api/graphql.
+
+[[mcp_server]]
+== MCP server
+
+Spexflix Server exposes an MCP (Model Context Protocol) server at ``/api/mcp`` (stateless streamable HTTP), letting AI assistants read the catalogue and playlists.
+Every tool only reads; none changes, uploads or processes anything.
+No tool returns addresses for playing a video, its HLS manifests, posters or subtitle files: videos are watched in Spexflix Web, which the tools link to when ``API_WEB_URL`` is set.
+
+|===
+|Tool|Returns
+
+|``list_videos``|The videos the caller can see, filtered by spex (an original also lists its revivals' videos), year, years, category or kind, and sorted; editors can include unpublished ones
+|``search_videos``|Videos whose titles, spex, descriptions, performances or chapters match
+|``get_video``|A video's title, year, kind, spex, performance, description, duration, resolution, chapters, subtitle languages and credits
+|``list_spex``|The spex that have published videos, with how many each
+|``list_playlists``|The caller's playlists and everyone's public ones
+|``get_playlist``|One of them, with its videos and clips
+
+|===
+
+Every tool call runs with the permissions of the signed-in user, as the GraphQL API does: viewers (``USER``) see the published videos, editors also the unpublished, processing and failed ones with their status, and a playlist is seen by its owner or, when public, by everyone.
+
+Authentication uses OAuth 2.0 against Keycloak with the public client ``fgv-spexflix-mcp`` (authorization code with PKCE, redirect URIs ``http://localhost:*`` and ``http://127.0.0.1:*``).
+Only tokens issued to that client (``API_KEYCLOAK_MCP_CLIENT_ID``) are accepted by the MCP endpoint, and they are not accepted by the rest of the API.
+The tokens must also have the MCP endpoint's address, ``API_BASE_URL`` with ``/api/mcp``, as audience, which ``fgv.json`` sets from ``SPEXFLIX_MCP_URL``.
+Users confirm the access once, on Keycloak's consent page.
+MCP clients discover Keycloak through the protected resource metadata at ``/.well-known/oauth-protected-resource/api/mcp``.
+Keycloak does not allow dynamic client registration by default, so configure the MCP client with the client id ``fgv-spexflix-mcp``.
+
+Locally, the MCP server is available at ``https://api.spexflix.fgv.local.nu:8443/api/mcp``.
+It can for instance be explored with the MCP Inspector (https://github.com/modelcontextprotocol/inspector).
 
 xref:index.adoc[Back to start page]
