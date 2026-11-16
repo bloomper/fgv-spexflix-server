@@ -3,8 +3,20 @@ logging:
     path: ./build/integrationtest-data/log_data
 
 spexflix:
-  data:
-    sample-user-password: s3cr3t-s3cr3t
+  # Scheduled jobs never fire on their own in tests: a test that needs one calls it, so a run at
+  # the wrong minute can't hold its lock or change data mid-test
+  jobs:
+    spex-refresh:
+      cron-expression: '-'
+    spexipedia-sync:
+      cron-expression: '-'
+    upload-cleanup:
+      cron-expression: '-'
+  # The MCP endpoint's audience in the realm copy is http://localhost:8083/api/mcp
+  base-url: http://localhost:8083
+  web-url: https://spexflix.test
+  mcp:
+    authorized-parties: fgv-spexflix-mcp,fgv-spexflix-mcp-unbound
   media:
     base-url: https://media.spexflix.test
     # Not a real key: the tests check the signatures with it

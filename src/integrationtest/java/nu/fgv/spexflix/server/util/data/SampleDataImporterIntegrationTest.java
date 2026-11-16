@@ -29,10 +29,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The sample data is built on Spexregister's: its spex, and its sample users, who get roles here. The only user of
+ * The sample data is built on Spexipedia's spex and fgv-infra-deploy's sample users, by their fixed ids. The only user of
  * Spexflix's own is {@code no-access@fgv.nu}. The worker is off, so the queued jobs stay queued.
  *
  * @author Anders Jacobsson
@@ -45,37 +44,26 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private SampleDataImporter importer;
 
-    private static void spexregisterWithSpex() {
-        SPEXREGISTER.stubFor(post(urlEqualTo("/api/graphql")).withRequestBody(containing("AllSpex"))
+    private static void spexipediaWithSpex() {
+        SPEXIPEDIA.stubFor(post(urlEqualTo("/api/graphql")).withRequestBody(containing("AllSpex"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
-                        {"data": {"spexPaged": {"edges": [
-                            {"node": {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}},
-                            {"node": {"id": "00000000-0000-7000-8000-000000000002", "year": "2024", "title": "Cleopatra", "revival": false, "parent": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}}
-                        ]}}}""")));
-    }
-
-    @Test
-    @Order(1)
-    void refusesWithoutSpexregistersSampleUsers() {
-        spexregisterWithSpex();
-
-        assertThatThrownBy(() -> importer.importSampleData()).hasMessageContaining("Spexregister's sample user");
+                        {"data": {"spexAll": [
+                            {"id": "00000000-0000-7000-8000-000000000001", "year": "1975", "title": "Nobel", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}},
+                            {"id": "00000000-0000-7000-8000-000000000002", "year": "2024", "title": "Cleopatra", "revival": false, "retired": false, "parent": null, "poster": null, "category": {"id": "00000000-0000-7000-8000-000000000001", "name": "Chalmersspexet"}}
+                        ]}}""")));
     }
 
     @Test
     @Order(2)
-    void buildsVideosOnSpexregistersSpexAndGivesItsUsersRoles() throws Exception {
-        createSpexregisterUser(SampleDataImporter.ADMIN);
-        createSpexregisterUser(SampleDataImporter.EDITOR);
-        createSpexregisterUser(SampleDataImporter.USER);
-        spexregisterWithSpex();
+    void buildsVideosOnSpexipediasSpexAndRecordsTheSampleUsers() throws Exception {
+        spexipediaWithSpex();
 
         importer.importSampleData();
 
-        assertThat(spexflixRoles(SampleDataImporter.ADMIN)).containsExactly("ADMIN", "EDITOR", "USER");
-        assertThat(spexflixRoles(SampleDataImporter.EDITOR)).containsExactly("EDITOR", "USER");
-        assertThat(spexflixRoles(SampleDataImporter.USER)).containsExactly("USER");
-        assertThat(spexflixRoles(SampleDataImporter.NO_ACCESS)).isEmpty();
+        // fgv-infra-deploy's sample users, recorded by their fixed ids without asking Keycloak
+        assertThat(jdbcClient.sql("SELECT subject FROM app_user ORDER BY subject").query(String.class).list()).containsExactly(
+                "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+                "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000005");
 
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video").query(Long.class).single()).isEqualTo(15);
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video WHERE trashed_at IS NOT NULL").query(Long.class).single()).isEqualTo(1);

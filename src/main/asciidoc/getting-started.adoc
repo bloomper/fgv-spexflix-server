@@ -55,8 +55,8 @@ $ docker compose up -d
 It creates the Docker network ``fgv-local``, which this repository's ``docker-compose.yaml`` joins.
 Keycloak imports the realm, with its clients and their secrets, from ``realm/fgv.json`` in https://github.com/bloomper/fgv-keycloak[fgv-keycloak].
 
-Spexflix reads spex from Spexregister, and its sample data is built on Spexregister's (see <<sample_data>>).
-Run https://github.com/bloomper/spexregister-server[spexregister-server]'s local stack as well, as its getting started guide describes.
+Spexflix reads spex from Spexipedia, and its sample data is built on Spexipedia's spex and Spexregister's users (see <<sample_data>>).
+Run the local stacks of fgv-spexipedia-server and https://github.com/bloomper/spexregister-server[spexregister-server] as well, as their getting started guides describe.
 
 [[configuration]]
 === Configuration
@@ -83,8 +83,7 @@ To see a changed placeholder after a pull, undo it with ``git update-index --no-
 
 |FGV_SPEXFLIX_MYSQL_ROOT_PASSWORD|The password for the root user of Spexflix Server's database||verysecret
 |FGV_SPEXFLIX_MYSQL_USER_PASSWORD|The password for the user of Spexflix Server's database||secret
-|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexflix-service``, with which Spexflix Server calls Spexregister and Spexify|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexflix-service`` and pick the value for ``secret`` in the same section|
-|API_KEYCLOAK_ADMIN_CLIENT_SECRET|The client secret of ``fgv-admin``, with which the sample data import gives users roles|Must match the value in ``realm/fgv.json``, search for ``fgv-admin``|
+|API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexflix-service``, with which Spexflix Server calls Spexipedia and Spexify|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexflix-service`` and pick the value for ``secret`` in the same section|
 |API_MEDIA_SIGNING_KEY|Signs the playback addresses, which the media server checks; shared by ``spexflix-api`` and ``spexflix-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 
 |===
@@ -98,17 +97,19 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |FGV_SPEXFLIX_MYSQL_ROOT_USER|The root user of Spexflix Server's database|root
 |FGV_SPEXFLIX_MYSQL_USER|The user of Spexflix Server's database|spexflix
 |API_KEYCLOAK_REALM|The Keycloak realm of Spexflix Server|fgv
-|API_KEYCLOAK_ADMIN_CLIENT_ID|The Keycloak admin client id of Spexflix Server|fgv-admin
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexflix Web|fgv-spexflix
 |API_SPEXIFY_GRAPHQL_URL|Spexify's GraphQL endpoint, for linking chapters to tracks; empty for none|(empty); ``http://spexify-api:8080/api/graphql`` when Spexify runs too
 |API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 videos) or ``large`` (about 300)|small
 |API_SAMPLE_DATA_PREPROCESSED|A flag making the import process the sample videos itself, so they are ready when the API has started|false
 |SPEXFLIX_WEB_ORIGIN|The web origin the media server allows (CORS)|http://localhost:3003
+|API_BASE_URL|The API's public address; the MCP endpoint's address, the audience of MCP tokens, is this with ``/api/mcp``|https://api.spexflix.fgv.local.nu:8443
+|API_WEB_URL|Spexflix Web's address, for the links MCP tools return; empty for none|http://localhost:3003 (profile ``local``), else empty
+|API_KEYCLOAK_MCP_CLIENT_ID|The Keycloak client whose tokens the MCP endpoint accepts|fgv-spexflix-mcp
 
 |===
 
-Access tokens are only accepted from the Keycloak clients ``fgv-spexflix`` and ``fgv-spexify-service`` (``API_SECURITY_AUTHORIZED_PARTIES``).
+Access tokens are only accepted from the Keycloak clients ``fgv-spexflix`` and ``fgv-spexify-service`` (``API_SECURITY_AUTHORIZED_PARTIES``), and at the MCP endpoint only from ``fgv-spexflix-mcp`` (see <<mcp_server>>).
 
 Add the following to `/etc/hosts` (or the Windows equivalent):
 
@@ -136,7 +137,7 @@ $ docker compose -f ../../fgv-infra-deploy/local/compose.yaml up -d
 $ docker compose up -d
 ----
 
-This starts MySQL, the media server and ``spexflix-api``, which reaches Keycloak and Spexregister by their container names on the ``fgv-local`` network and, in the Spring profile ``local``, also runs the processing worker.
+This starts MySQL, the media server and ``spexflix-api``, which reaches Keycloak and Spexipedia by their container names on the ``fgv-local`` network and, in the Spring profile ``local``, also runs the processing worker.
 Caddy serves the API on ``https://api.spexflix.fgv.local.nu:8443`` and the media server on ``https://media.spexflix.fgv.local.nu:8443``.
 MySQL and the media server are also published on localhost, on ports 3309 and 8084.
 The media server's configuration is ``media/default.conf.template`` in a sibling https://github.com/bloomper/fgv-spexflix-deploy[fgv-spexflix-deploy] checkout, or where ``SPEXFLIX_DEPLOY`` points.
@@ -147,7 +148,7 @@ When the ``spexflix-api`` container isn't running, Caddy forwards ``https://api.
 ----
 $ docker compose up -d spexflix-mysql spexflix-media
 $ MYSQL_API_USER_PASSWORD=<FGV_SPEXFLIX_MYSQL_USER_PASSWORD> \
-  API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_KEYCLOAK_ADMIN_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
+  API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   ./gradlew bootRun --args='--spring.profiles.active=local'
 ----
 
@@ -173,20 +174,13 @@ How videos are processed and played is described in the xref:graphql-api-guide.a
 
 If ``API_IMPORT_SAMPLE_DATA`` is set to ``true``, the database is replaced and the media folders are emptied at every start (it refuses in the Spring profile ``production``).
 None of the data can be traced to real individuals, i.e. no personally identifiable information (PII).
-The import needs the secret of ``fgv-admin``.
 
-The sample data is built on Spexregister's, so Spexregister must run with ``API_IMPORT_SAMPLE_DATA=true``:
+The sample data is built on Spexipedia's and Spexregister's, so both must run with ``API_IMPORT_SAMPLE_DATA=true``:
 
-* The albums belong to Spexregister's sample spex, read from its API.
-The import waits up to 5 minutes for Spexregister.
-* Spexregister's sample users get roles on ``fgv-spexflix`` (see <<test_credentials>>).
-The import refuses to run without them, which keeps it away from real environments.
-
-[sidebar]
-.NOTE
---
-Spexregister's import deletes all Keycloak users at every start, so restart Spexflix Server after Spexregister.
---
+* The albums belong to Spexipedia's sample spex, read from its API.
+The import waits up to 5 minutes for Spexipedia.
+* The sample users are fgv-infra-deploy's (``bin/seed-users.sh``), with their roles on ``fgv-spexflix`` there (see <<test_credentials>>).
+The import records them by their fixed ids and never asks Keycloak, so it needs no admin client and does not wait for Spexregister.
 
 The import generates originals with ffmpeg, one per path through processing (H.264 1080p copied, H.264 720p, VP9 re-encoded, interlaced MPEG-2 deinterlaced, a file that is not video), builds about 15 videos (about 300 with ``API_SAMPLE_DATA_SIZE=large``) with chapters, subtitles, viewing history and audit entries, and queues them for the worker.
 With ``API_SAMPLE_DATA_PREPROCESSED=true`` it processes each distinct original itself instead, so every video is ready when the API has started.
@@ -205,7 +199,7 @@ The username is ``KEYCLOAK_ADMIN`` in fgv-infra-deploy's ``local/.env`` and the 
 === Setup
 
 The realm is defined by ``realm/fgv.json`` in fgv-keycloak, whose README describes what it contains.
-Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-service`` (calls to Spexregister and Spexify) and ``fgv-admin`` (the sample data's users).
+Spexflix uses its clients ``fgv-spexflix`` (the web, and Spexflix's roles), ``fgv-spexflix-mcp`` (MCP clients) and ``fgv-spexflix-service`` (calls to Spexipedia and Spexify).
 
 The integration tests import a copy of ``fgv.json`` at ``src/integrationtest/resources/realm/fgv.json``.
 After every realm change, replace it with the new ``realm/fgv.json`` from fgv-keycloak and commit it.
@@ -242,7 +236,7 @@ There are two types of tests:
 Unit tests do not require any external dependencies, such as a database, and are therefore quicker to run; the processing tests run a real transcode with ffmpeg.
 Among them are the API tests, which are used to generate the xref:api-guide.adoc[HTTP API documentation].
 
-Integration tests start MySQL and Keycloak with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexregister and Spexify.
+Integration tests start MySQL and Keycloak with Testcontainers, so they need Docker, and use WireMock as a stand-in for Spexipedia and Spexify.
 The worker runs in the test application, so uploads are processed into HLS with ffmpeg for real.
 
 [source,bash]
@@ -256,8 +250,7 @@ $ ./gradlew build              # all of the above, plus this documentation
 [[test_credentials]]
 == Test credentials
 
-The following test users have roles on ``fgv-spexflix`` when sample data is imported (see <<sample_data>>), with the password in ``SAMPLE_USER_PASSWORD`` (``s3cr3t-s3cr3t`` in the ``local`` profile, the same as Spexregister's; every other environment must set it).
-The first three are Spexregister's sample users, which are the same in every FGV application.
+The following test users have roles on ``fgv-spexflix``, from fgv-infra-deploy's ``bin/seed-users.sh`` (``sample-users.tsv``), which creates them, with the same ids and password, in every FGV application: ``s3cr3t-s3cr3t`` locally, its ``secrets/SAMPLE_USER_PASSWORD`` on staging.
 
 |===
 |Username|Roles on ``fgv-spexflix``|Comment
@@ -265,11 +258,11 @@ The first three are Spexregister's sample users, which are the same in every FGV
 |admin@fgv.nu|``USER``, ``EDITOR``, ``ADMIN``|
 |editor@fgv.nu|``USER``, ``EDITOR``|Has made the audit log's changes
 |user@fgv.nu|``USER``|Has progress on two videos (one half-watched, one finished) and a watch list
-|no-access@fgv.nu|None|Created by the import when missing; shared with Spexify's sample data
+|no-access@fgv.nu|None|Shared with Spexify's sample data
 
 |===
 
-With Spexify's sample data too, the three Spexregister users have ``USER`` on both, so they see the links between them.
+With Spexify's sample data too, the three sample users have ``USER`` on both, so they see the links between them.
 
 [[testing_the_api]]
 == Testing the API
@@ -297,5 +290,36 @@ Enter values as follows (leave other fields empty).
 
 Request an access token by clicking ``Get New Access Token`` and use any of the test credentials to login.
 Use the obtained access token when invoking the API, e.g. https://api.spexflix.fgv.local.nu:8443/api/graphql.
+
+[[mcp_server]]
+== MCP server
+
+Spexflix Server exposes an MCP (Model Context Protocol) server at ``/api/mcp`` (stateless streamable HTTP), letting AI assistants read the catalogue and playlists.
+Every tool only reads; none changes, uploads or processes anything.
+No tool returns addresses for playing a video, its HLS manifests, posters or subtitle files: videos are watched in Spexflix Web, which the tools link to when ``API_WEB_URL`` is set.
+
+|===
+|Tool|Returns
+
+|``list_videos``|The videos the caller can see, filtered by spex (an original also lists its revivals' videos), year, years, category or kind, and sorted; editors can include unpublished ones
+|``search_videos``|Videos whose titles, spex, descriptions, performances or chapters match
+|``get_video``|A video's title, year, kind, spex, performance, description, duration, resolution, chapters, subtitle languages and credits
+|``list_spex``|The spex that have published videos, with how many each
+|``list_playlists``|The caller's playlists and everyone's public ones
+|``get_playlist``|One of them, with its videos and clips
+
+|===
+
+Every tool call runs with the permissions of the signed-in user, as the GraphQL API does: viewers (``USER``) see the published videos, editors also the unpublished, processing and failed ones with their status, and a playlist is seen by its owner or, when public, by everyone.
+
+Authentication uses OAuth 2.0 against Keycloak with the public client ``fgv-spexflix-mcp`` (authorization code with PKCE, redirect URIs ``http://localhost:*`` and ``http://127.0.0.1:*``).
+Only tokens issued to that client (``API_KEYCLOAK_MCP_CLIENT_ID``) are accepted by the MCP endpoint, and they are not accepted by the rest of the API.
+The tokens must also have the MCP endpoint's address, ``API_BASE_URL`` with ``/api/mcp``, as audience, which ``fgv.json`` sets from ``SPEXFLIX_MCP_URL``.
+Users confirm the access once, on Keycloak's consent page.
+MCP clients discover Keycloak through the protected resource metadata at ``/.well-known/oauth-protected-resource/api/mcp``.
+Keycloak does not allow dynamic client registration by default, so configure the MCP client with the client id ``fgv-spexflix-mcp``.
+
+Locally, the MCP server is available at ``https://api.spexflix.fgv.local.nu:8443/api/mcp``.
+It can for instance be explored with the MCP Inspector (https://github.com/modelcontextprotocol/inspector).
 
 xref:index.adoc[Back to start page]

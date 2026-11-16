@@ -3,10 +3,10 @@
 ## Overview
 
 Spexflix Server is the backend of Spexflix, FGV's video service for the recordings of the spex. It is a Spring Boot
-application with a GraphQL API and plain HTTP endpoints for posters and for poster, subtitle and resumable (tus)
-uploads. A worker, the same image with `API_WORKER_ENABLED=true`, processes uploads into HLS with ffmpeg, and the
+application with a GraphQL API, plain HTTP endpoints for posters and for poster, subtitle and resumable (tus)
+uploads, and a read-only MCP server at `/api/mcp` for AI assistants. A worker, the same image with `API_WORKER_ENABLED=true`, processes uploads into HLS with ffmpeg, and the
 media server (`spexflix-media`, nginx) serves the video from signed, expiring addresses. It is backed by MySQL, a media
-folder and Keycloak ([fgv-keycloak][1]) for authentication, reads spex from Spexregister and links chapters to
+folder and Keycloak ([fgv-keycloak][1]) for authentication, reads spex from Spexipedia and links chapters to
 Spexify's tracks. [Spexflix Web][2] is its frontend and [fgv-spexflix-deploy][3] runs it on a server.
 
 The product spec is in [fgv-spexflix-spec][4].

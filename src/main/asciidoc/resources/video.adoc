@@ -16,7 +16,7 @@ Video itself is never served by Spexflix Server, but by the media server from si
 [[poster]]
 == Poster
 
-The uploaded poster, else the frame taken while processing, else the poster of the video's spex from Spexregister, else `404 Not Found`.
+The uploaded poster, else the frame taken while processing, else the poster of the video's spex from Spexipedia, else `404 Not Found`.
 
 operation::video-poster-get[snippets='security,path-parameters,request-headers,http-request,response-headers']
 

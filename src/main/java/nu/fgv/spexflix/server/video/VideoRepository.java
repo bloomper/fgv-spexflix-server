@@ -56,6 +56,12 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
     @Query("SELECT DISTINCT v FROM Video v JOIN v.spex s")
     List<Video> findWithSpex();
 
+    @Query("""
+            SELECT DISTINCT v FROM Video v JOIN v.spex s
+            WHERE v.trashedAt IS NULL AND v.published = TRUE AND v.status = nu.fgv.spexflix.server.video.VideoStatus.READY
+              AND (s.id IN :spexIds OR s.parentId IN :spexIds)""")
+    List<Video> findListedBySpex(@org.springframework.data.repository.query.Param("spexIds") java.util.Collection<java.util.UUID> spexIds);
+
     /**
      * Videos about one of the spex or, for originals, one of their revivals.
      */

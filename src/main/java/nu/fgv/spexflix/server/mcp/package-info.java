@@ -14,22 +14,11 @@
  * limitations under the License.
  */
 
-package nu.fgv.spexflix.server.util.error;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-
 /**
- * Spexregister could not be reached when it was needed.
- *
- * @author Anders Jacobsson
- * @since 1.0
+ * The MCP server's tools: read-only views of the catalogue and playlists, on the services and their access rules. No
+ * tool plays, uploads, processes or changes anything.
  */
-public class SpexregisterUnavailableException extends ResponseStatusException {
+@NullMarked
+package nu.fgv.spexflix.server.mcp;
 
-    public static final String MESSAGE_CODE = "error.spexregister.unavailable";
-
-    public SpexregisterUnavailableException(final Throwable cause) {
-        super(HttpStatus.SERVICE_UNAVAILABLE, MESSAGE_CODE, cause, MESSAGE_CODE, null);
-    }
-}
+import org.jspecify.annotations.NullMarked;

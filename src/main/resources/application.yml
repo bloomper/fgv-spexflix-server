@@ -50,6 +50,28 @@ spring:
         enabled: false
     http:
       path: /api/graphql
+  ai:
+    mcp:
+      server:
+        name: fgv-spexflix
+        version: 1.0.0
+        type: SYNC
+        protocol: STATELESS
+        streamable-http:
+          mcp-endpoint: /api/mcp
+        capabilities:
+          resource: false
+          prompt: false
+          completion: false
+        instructions: >-
+          Spexflix is FGV's video service for the recordings of the spex. Every call runs with the permissions of
+          the signed-in user and returns only the videos and playlists they can see. Every tool only reads: nothing
+          is changed, uploaded or processed here, and no tool gives addresses for playing a video, its posters or
+          its subtitle files; videos are watched in Spexflix Web, which the webUrl fields link to when Spexflix
+          knows its address. A video is about one or more spex, by their ids in Spexipedia; a revival keeps the id
+          of its original, so listing the videos of an original also lists those of its revivals. Editors also see
+          unpublished, processing and failed videos when they ask for them, with their status.
+          Playlists are users' own lists of videos and clips (a chapter of a video): yours and everyone's public ones.
 
 management:
   server:
@@ -71,20 +93,26 @@ logging:
     path: ./data/log_data
 
 spexflix:
+  # The API's public address, e.g. the MCP endpoint's audience
+  base-url: ${API_BASE_URL:https://api.spexflix.fgv.local.nu:8443}
+  # Spexflix Web, for links to its pages; empty for none
+  web-url: ${API_WEB_URL:}
   time-zone: Europe/Stockholm
   jobs:
     spex-refresh:
       cron-expression: 0 15 3 * * * # Every day at 03:15
+    spexipedia-sync:
+      cron-expression: 0 */5 * * * * # Every five minutes
     upload-cleanup:
       cron-expression: 0 5 * * * * # Every hour at :05
   keycloak:
     url: ${API_KEYCLOAK_URL:https://auth.fgv.local.nu:8443/auth}
     realm: ${API_KEYCLOAK_REALM:fgv}
-    # Only for the sample data import, which creates users
-    admin-client-id: ${API_KEYCLOAK_ADMIN_CLIENT_ID:fgv-admin}
-    admin-client-secret: ${API_KEYCLOAK_ADMIN_CLIENT_SECRET:}
   security:
-    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service}
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service,fgv-spexipedia-service}
+  mcp:
+    # Only tokens of MCP clients, never the web's, are accepted at /api/mcp
+    authorized-parties: ${API_KEYCLOAK_MCP_CLIENT_ID:fgv-spexflix-mcp}
   media:
     root: ${API_MEDIA_ROOT:./data/media}
     max-upload-size: ${API_MAX_UPLOAD_SIZE:50GB}
@@ -96,16 +124,16 @@ spexflix:
   worker:
     enabled: ${API_WORKER_ENABLED:false}
     priority: 10
-  spexregister:
-    graphql-url: ${API_SPEXREGISTER_GRAPHQL_URL:https://api.register.fgv.local.nu:8443/api/graphql}
+  spexipedia:
+    graphql-url: ${API_SPEXIPEDIA_GRAPHQL_URL:https://api.spexipedia.fgv.local.nu:8443/api/graphql}
+    web-url: ${SPEXIPEDIA_WEB_URL:}
+    sync-enabled: ${API_SPEXIPEDIA_SYNC_ENABLED:true}
   spexify:
     graphql-url: ${API_SPEXIFY_GRAPHQL_URL:}
   data:
     import-sample-data: ${API_IMPORT_SAMPLE_DATA:false}
     sample-data-size: ${API_SAMPLE_DATA_SIZE:small}
     sample-data-preprocessed: ${API_SAMPLE_DATA_PREPROCESSED:false}
-    # Needed only to import sample data; the local profile has a development value
-    sample-user-password: ${SAMPLE_USER_PASSWORD:}
 
 ---
 spring:
@@ -129,9 +157,7 @@ management:
     port: 9003
 
 spexflix:
-  data:
-    # For development only; every other environment sets SAMPLE_USER_PASSWORD
-    sample-user-password: ${SAMPLE_USER_PASSWORD:s3cr3t-s3cr3t}
+  web-url: ${API_WEB_URL:http://localhost:3003}
   keycloak:
     url: https://auth.fgv.local.nu:8443/auth
   media:

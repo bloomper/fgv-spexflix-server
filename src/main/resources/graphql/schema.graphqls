@@ -44,7 +44,7 @@ type Query {
     search(q: String!): [Video!]!
     "USER. Signed addresses for playing a ready video, valid for its duration plus a margin."
     playback(videoId: ID!): Playback!
-    "EDITOR. Spex in Spexregister matching a title or year: each original, then its revivals, newest original first. An original is included when only a revival matches."
+    "EDITOR. Spex in Spexipedia, retired ones left out, matching a title or year: each original, then its revivals, newest original first. An original is included when only a revival matches."
     spexSearch(q: String!): [Spex!]!
     "EDITOR. The published Spexify tracks of the video's spex and their originals' revivals, for linking chapters; empty when Spexify is unavailable."
     spexifyTracks(videoId: ID!): [SpexifyTrack!]!
@@ -62,6 +62,8 @@ type Query {
     auditActors: [AuditActor!]!
     "ADMIN. The scheduled maintenance jobs, with their schedules and how their latest runs went."
     maintenanceJobs: [MaintenanceJobStatus!]!
+    "SPEXIPEDIA. The published videos about the spex (or revivals of them). At most 500 ids."
+    spexipediaVideos(spexIds: [ID!]!): [SpexipediaVideo!]!
 }
 
 type Mutation {
@@ -229,7 +231,7 @@ enum TopBy {
 }
 
 input VideoInput {
-    "Spex in Spexregister, the main one first, e.g. several for a jubilee show. Empty when the video is not about any spex."
+    "Spex in Spexipedia, the main one first, e.g. several for a jubilee show. Empty when the video is not about any spex."
     spexIds: [ID!]! = []
     "Defaults to the main spex's title; required without a spex."
     title: String
@@ -426,7 +428,7 @@ type AuditLogEntry {
 }
 
 """
-A scheduled maintenance job: copying the current spex data from Spexregister (SPEX_REFRESH), and removing uploads that
+A scheduled maintenance job: copying the current spex data from Spexipedia in full (SPEX_REFRESH; changes also arrive from its change feed within minutes), and removing uploads that
 were never used (UPLOAD_CLEANUP).
 """
 enum MaintenanceJob {
@@ -547,4 +549,11 @@ type CreditedVideo {
     video: Video!
     "What the name does or plays in the video."
     role: String
+}
+
+type SpexipediaVideo {
+    id: ID!
+    title: String!
+    "The spex asked for that the video is about."
+    spexId: ID
 }
