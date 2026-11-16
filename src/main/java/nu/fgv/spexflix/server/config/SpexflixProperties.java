@@ -31,6 +31,7 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "spexflix")
 public record SpexflixProperties(String timeZone,
+                                 Imports imports,
                                  Keycloak keycloak,
                                  Security security,
                                  Media media,
@@ -74,5 +75,12 @@ public record SpexflixProperties(String timeZone,
     }
 
     public record Data(boolean importSampleData, String sampleDataSize, boolean sampleDataPreprocessed) {
+    }
+
+    /**
+     * @param root      files received through the import API, {@code files/<sha256>}
+     * @param keepFiles how long a received file is kept when no batch uses it
+     */
+    public record Imports(java.nio.file.Path root, java.time.Duration keepFiles) {
     }
 }

@@ -108,6 +108,10 @@ public class Video extends AbstractAuditable {
     @Column(name = "original_name")
     private @Nullable String originalName;
 
+    /** The SHA-256 of the file an import brought, so that importing it again changes nothing. */
+    @Column(name = "source_checksum")
+    private @Nullable String sourceChecksum;
+
     @Column(name = "original_extension")
     private @Nullable String originalExtension;
 

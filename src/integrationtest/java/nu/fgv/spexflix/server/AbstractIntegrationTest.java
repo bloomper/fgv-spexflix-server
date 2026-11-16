@@ -365,7 +365,7 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void resetState() throws IOException {
         jdbcClient.sql("SET FOREIGN_KEY_CHECKS = 0").update();
-        for (final String table : List.of("audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
+        for (final String table : List.of("import_key", "audit_entry", "video_collection_video", "video_collection", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
                 "chapter", "subtitle", "rendition", "playlist_item", "playlist", "video", "upload_session", "app_user", "spexipedia_category")) {
             jdbcClient.sql("TRUNCATE TABLE " + table).update();
         }
@@ -376,12 +376,13 @@ public abstract class AbstractIntegrationTest {
         // Back to the video kinds of the migration, which a test may have changed
         jdbcClient.sql("DELETE FROM video_kind").update();
         jdbcClient.sql("""
-                INSERT INTO video_kind (uuid, name_sv, name_en, position, created_by, created_at)
-                VALUES ('00000000-0000-7000-8000-00000000b001', 'Föreställning', 'Show', 1, 'system', NOW(6)),
-                       ('00000000-0000-7000-8000-00000000b002', 'Nummer', 'Number', 2, 'system', NOW(6)),
-                       ('00000000-0000-7000-8000-00000000b003', 'Trailer', 'Trailer', 3, 'system', NOW(6)),
-                       ('00000000-0000-7000-8000-00000000b004', 'Bakom kulisserna', 'Behind the scenes', 4, 'system', NOW(6)),
-                       ('00000000-0000-7000-8000-00000000b005', 'Övrigt', 'Other', 5, 'system', NOW(6))""").update();
+                INSERT INTO video_kind (uuid, name_sv, name_en, aliases, position, created_by, created_at)
+                VALUES ('00000000-0000-7000-8000-00000000b001', 'Föreställning', 'Show', 'originalföreställning\nnyuppsättning', 1, 'system', NOW(6)),
+                       ('00000000-0000-7000-8000-00000000b006', 'Buskföreställning', 'Busk show', 'busk', 2, 'system', NOW(6)),
+                       ('00000000-0000-7000-8000-00000000b002', 'Nummer', 'Number', '', 3, 'system', NOW(6)),
+                       ('00000000-0000-7000-8000-00000000b003', 'Trailer', 'Trailer', '', 4, 'system', NOW(6)),
+                       ('00000000-0000-7000-8000-00000000b004', 'Bakom kulisserna', 'Behind the scenes', 'rephelg', 5, 'system', NOW(6)),
+                       ('00000000-0000-7000-8000-00000000b005', 'Övrigt', 'Other', '', 6, 'system', NOW(6))""").update();
         // Back to the defaults, which an admin test may have changed
         jdbcClient.sql("DELETE FROM settings").update();
         storage.wipe();

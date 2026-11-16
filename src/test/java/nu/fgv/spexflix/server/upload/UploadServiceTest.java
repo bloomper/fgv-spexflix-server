@@ -81,7 +81,7 @@ class UploadServiceTest {
 
     @BeforeEach
     void setUp() {
-        final SpexflixProperties properties = new SpexflixProperties(null, null, null,
+        final SpexflixProperties properties = new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(folder, DataSize.ofBytes(100), null, null, null), null, null, null, null);
 
         lenient().when(settingsService.current()).thenReturn(new Settings());

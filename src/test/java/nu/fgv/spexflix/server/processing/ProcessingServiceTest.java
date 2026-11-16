@@ -80,7 +80,7 @@ class ProcessingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProcessingService(jobRepository, videoRepository, new MediaStorage(new SpexflixProperties(null, null, null,
+        service = new ProcessingService(jobRepository, videoRepository, new MediaStorage(new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(root, DataSize.ofGigabytes(1), null, null, null), null, null, null, null)), callerService);
     }
 

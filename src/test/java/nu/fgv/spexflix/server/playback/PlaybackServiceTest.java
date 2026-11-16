@@ -87,7 +87,7 @@ class PlaybackServiceTest {
 
     @BeforeEach
     void setUp() {
-        final SpexflixProperties properties = new SpexflixProperties(null, null, null,
+        final SpexflixProperties properties = new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(Path.of("/media"), DataSize.ofGigabytes(1), "https://media.test", "key", Duration.ofHours(4)),
                 null, null, null, null);
 

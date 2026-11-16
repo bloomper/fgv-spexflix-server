@@ -142,7 +142,7 @@ class VideoServiceTest {
 
     @BeforeEach
     void setUp() {
-        storage = new MediaStorage(new SpexflixProperties(null, null, null,
+        storage = new MediaStorage(new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(root, DataSize.ofGigabytes(1), "https://media.test", "key", null), null, null, null, null));
         service = new VideoService(videoRepository, kindService, jobRepository, callerService, spexService, uploadService, storage, transcoder,
                 auditService, Clock.fixed(NOW, ZoneOffset.UTC));

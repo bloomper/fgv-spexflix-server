@@ -295,12 +295,43 @@ public class VideoService {
 
         final Video video = editable(id);
 
+        requireNotProcessing(video);
+
+        final Path upload = uploadService.claim(uploadId, caller);
+        final VideoDto dto = take(video, upload, uploadService.fileName(uploadId), "UPLOAD");
+
+        uploadService.release(uploadId);
+        return dto;
+    }
+
+    /**
+     * EDITOR (an import, Spexipedia's docs/content-import.md, section 4). Takes a file received through the import API as
+     * the video's file and queues it, as an upload is taken; the file is moved, not copied, since videos are large, and
+     * goes back to the import's store on a rollback. Nothing happens when the video already has this file (by the
+     * checksum of what was imported).
+     */
+    @Transactional
+    public VideoDto importFile(final UUID id, final Path file, final String sha256, final String name) {
+        callerService.current().requireEditor();
+
+        final Video video = editable(id);
+
+        if (sha256.equals(video.getSourceChecksum())) {
+            return VideoDtos.toDto(video);
+        }
+        requireNotProcessing(video);
+        video.setSourceChecksum(sha256);
+        return take(video, file, name, "IMPORT");
+    }
+
+    private void requireNotProcessing(final Video video) {
         if (jobRepository.existsByVideoIdAndStatusIn(video.getId(), EnumSet.of(JobStatus.QUEUED, JobStatus.RUNNING))) {
             throw new BadRequestException("error.video.processing");
         }
+    }
 
-        final Path upload = uploadService.claim(uploadId, caller);
-        final String name = uploadService.fileName(uploadId);
+    private VideoDto take(final Video video, final Path upload, final String name, final String action) {
+
         final String extension = MediaStorage.extensionOf(name.isEmpty() ? "video.bin" : name);
         final boolean first = video.getOriginalExtension() == null || video.getStatus() != VideoStatus.READY;
         final ProcessingJob job = new ProcessingJob();
@@ -342,7 +373,6 @@ public class VideoService {
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-        uploadService.release(uploadId);
         if (first) {
             video.setStatus(VideoStatus.PROCESSING);
             video.setFailure(null);
@@ -351,9 +381,31 @@ public class VideoService {
         job.setSource(storage.root().relativize(target).toString());
         job.setCreatedAt(clock.instant());
         jobRepository.save(job);
-        auditService.record(first ? "UPLOAD" : "REPLACE", "VIDEO", video.getUuid(),
-                (first ? "Laddade upp filen till " : "Bytte filen för ") + video.getTitle());
+        auditService.record(first ? action : "REPLACE", "VIDEO", video.getUuid(),
+                (first ? (action.equals("IMPORT") ? "Importerade filen till " : "Laddade upp filen till ") : "Bytte filen för ") + video.getTitle());
         return VideoDtos.toDto(video);
+    }
+
+    /** The optimistic-lock version of a video, or null when it is gone. */
+    @Transactional(readOnly = true)
+    public @Nullable Long recordVersion(final UUID id) {
+        return videoRepository.findByUuid(id).map(Video::getVersion).orElse(null);
+    }
+
+    /**
+     * EDITOR (an import's forget). Deletes an imported video that nobody has published; returns whether it was.
+     */
+    @Transactional
+    public boolean forget(final UUID id) {
+        callerService.current().requireEditor();
+
+        final Video video = videoRepository.findByUuid(id).orElse(null);
+
+        if (video == null || video.isPublished()) {
+            return false;
+        }
+        deleteVideo(video);
+        return true;
     }
 
     /**

@@ -247,6 +247,28 @@ public class CollectionService {
         return repository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.collection.notFound", id));
     }
 
+    /** The optimistic-lock version of a collection, or null when it is gone. */
+    @Transactional(readOnly = true)
+    public @Nullable Long recordVersion(final UUID id) {
+        return repository.findByUuid(id).map(VideoCollection::getVersion).orElse(null);
+    }
+
+    /**
+     * EDITOR (an import's forget). Deletes an imported collection; its videos stay.
+     */
+    @Transactional
+    public boolean forget(final UUID id) {
+        callerService.current().requireEditor();
+
+        final VideoCollection collection = repository.findByUuid(id).orElse(null);
+
+        if (collection == null) {
+            return false;
+        }
+        repository.delete(collection);
+        return true;
+    }
+
     public record CollectionDto(UUID id, String title, @Nullable String description, List<VideoDto> videos,
                                 Instant createdAt, @Nullable Instant lastModifiedAt) {
     }

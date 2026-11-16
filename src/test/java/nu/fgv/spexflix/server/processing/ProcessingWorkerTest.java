@@ -84,7 +84,7 @@ class ProcessingWorkerTest {
     private Settings settings;
 
     private ProcessingWorker worker(final boolean enabled) {
-        final SpexflixProperties properties = new SpexflixProperties(null, null, null,
+        final SpexflixProperties properties = new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(root, DataSize.ofGigabytes(1), "https://media.test", "key", Duration.ofHours(4)),
                 new SpexflixProperties.Worker(enabled, 10), null, null, null);
 

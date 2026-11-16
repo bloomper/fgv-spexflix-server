@@ -16,6 +16,7 @@
 
 package nu.fgv.spexflix.server.maintenance;
 
+import nu.fgv.spexflix.server.imports.ImportFileStore;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.spex.SpexService;
 import nu.fgv.spexflix.server.upload.UploadService;
@@ -47,10 +48,13 @@ public class MaintenanceJobs {
     private final ConcurrentMap<MaintenanceJob, Run> lastRuns = new ConcurrentHashMap<>();
 
     @Autowired
-    public MaintenanceJobs(final SpexService spexService, final UploadService uploadService) {
+    public MaintenanceJobs(final SpexService spexService, final UploadService uploadService, final ImportFileStore importFiles) {
         this(Map.of(
                 MaintenanceJob.SPEX_REFRESH, spexService::refresh,
-                MaintenanceJob.UPLOAD_CLEANUP, uploadService::cleanUp
+                MaintenanceJob.UPLOAD_CLEANUP, () -> {
+                    uploadService.cleanUp();
+                    importFiles.cleanUp();
+                }
         ));
     }
 
