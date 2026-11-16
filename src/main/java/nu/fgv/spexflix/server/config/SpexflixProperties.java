@@ -39,7 +39,7 @@ public record SpexflixProperties(String timeZone,
                                  Spexify spexify,
                                  Data data) {
 
-    public record Keycloak(String url, String realm, String adminClientId, String adminClientSecret) {
+    public record Keycloak(String url, String realm) {
     }
 
     public record Security(List<String> authorizedParties) {
@@ -73,7 +73,6 @@ public record SpexflixProperties(String timeZone,
     public record Spexify(String graphqlUrl) {
     }
 
-    public record Data(boolean importSampleData, String sampleDataSize, boolean sampleDataPreprocessed,
-                       String sampleUserPassword) {
+    public record Data(boolean importSampleData, String sampleDataSize, boolean sampleDataPreprocessed) {
     }
 }

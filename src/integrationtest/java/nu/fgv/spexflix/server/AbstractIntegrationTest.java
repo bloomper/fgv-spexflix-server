@@ -128,7 +128,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> KEYCLOAK.getAuthServerUrl() + "/realms/" + REALM);
         registry.add("spring.security.oauth2.client.registration.fgv-spexflix-service.client-secret", () -> SECRETS.get("fgv-spexflix-service"));
         registry.add("spexflix.keycloak.url", KEYCLOAK::getAuthServerUrl);
-        registry.add("spexflix.keycloak.admin-client-secret", () -> SECRETS.get("fgv-admin"));
         registry.add("spexflix.media.root", MEDIA::toString);
         registry.add("spexflix.spexipedia.graphql-url", () -> SPEXIPEDIA.baseUrl() + "/api/graphql");
         // Tests pull the feed themselves

@@ -29,10 +29,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The sample data is built on Spexipedia's spex and Spexregister's sample users, who get roles here. The only user of
+ * The sample data is built on Spexipedia's spex and fgv-infra-deploy's sample users, by their fixed ids. The only user of
  * Spexflix's own is {@code no-access@fgv.nu}. The worker is off, so the queued jobs stay queued.
  *
  * @author Anders Jacobsson
@@ -55,27 +54,16 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @Order(1)
-    void refusesWithoutSpexregistersSampleUsers() {
-        spexipediaWithSpex();
-
-        assertThatThrownBy(() -> importer.importSampleData()).hasMessageContaining("Spexregister's sample user");
-    }
-
-    @Test
     @Order(2)
-    void buildsVideosOnSpexipediasSpexAndGivesItsUsersRoles() throws Exception {
-        createSpexregisterUser(SampleDataImporter.ADMIN);
-        createSpexregisterUser(SampleDataImporter.EDITOR);
-        createSpexregisterUser(SampleDataImporter.USER);
+    void buildsVideosOnSpexipediasSpexAndRecordsTheSampleUsers() throws Exception {
         spexipediaWithSpex();
 
         importer.importSampleData();
 
-        assertThat(spexflixRoles(SampleDataImporter.ADMIN)).containsExactly("ADMIN", "EDITOR", "USER");
-        assertThat(spexflixRoles(SampleDataImporter.EDITOR)).containsExactly("EDITOR", "USER");
-        assertThat(spexflixRoles(SampleDataImporter.USER)).containsExactly("USER");
-        assertThat(spexflixRoles(SampleDataImporter.NO_ACCESS)).isEmpty();
+        // fgv-infra-deploy's sample users, recorded by their fixed ids without asking Keycloak
+        assertThat(jdbcClient.sql("SELECT subject FROM app_user ORDER BY subject").query(String.class).list()).containsExactly(
+                "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002",
+                "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000005");
 
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video").query(Long.class).single()).isEqualTo(15);
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video WHERE trashed_at IS NOT NULL").query(Long.class).single()).isEqualTo(1);
