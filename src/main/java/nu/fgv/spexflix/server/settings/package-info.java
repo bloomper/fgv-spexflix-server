@@ -15,7 +15,8 @@
  */
 
 /**
- * Settings an admin changes in the web: start page texts, the largest upload and whether originals are kept.
+ * Settings an admin changes in the web: start page texts and its featured video, whether casting is offered, the
+ * largest upload and whether originals are kept.
  */
 @NullMarked
 package nu.fgv.spexflix.server.settings;

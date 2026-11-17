@@ -4,8 +4,10 @@ scalar Void
 type Query {
     "Anyone logged in. The caller and their roles."
     me: Me!
-    "USER. The start page texts and the upload limit."
+    "USER. The start page texts, its featured video, whether casting is offered, and the upload limit."
     settings: Settings!
+    "USER. The video at the top of the start page: the one an admin picked while it is listed, else the newest listed video of the default kind (by year, then by when it was published), else the most recently published one. Null when no video is listed."
+    featuredVideo: Video
     "USER. Videos by year, newest first, or in the filter's order. Unpublished, processing and failed ones only for EDITOR, when asked for."
     videos(filter: VideoFilter): [Video!]!
     "USER. A video; unpublished, unprocessed or trashed ones only for EDITOR."
@@ -150,16 +152,23 @@ type Me {
 type Settings {
     welcomeSv: String
     welcomeEn: String
+    "The video an admin picked for the top of the start page, or null for the newest show (see featuredVideo)."
+    featuredVideoId: ID
     maxUploadGb: Int!
     "Whether originals are kept after processing, as the archive copy."
     keepOriginals: Boolean!
+    "Whether the player offers casting to a Chromecast."
+    castingEnabled: Boolean!
 }
 
 input SettingsInput {
     welcomeSv: String
     welcomeEn: String
+    "A video outside the trash, or null for the newest show."
+    featuredVideoId: ID
     maxUploadGb: Int!
     keepOriginals: Boolean!
+    castingEnabled: Boolean! = true
 }
 
 "What a video is, e.g. a full show or a trailer. Configured by admins."

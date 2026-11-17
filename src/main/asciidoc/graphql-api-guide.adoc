@@ -120,6 +120,7 @@ Files live in the media folder (``API_MEDIA_ROOT``), never in the database:
 
 ``playback(videoId)`` returns signed, expiring addresses on the media server for the HLS playlist, the timeline thumbnails and the subtitles, valid for the video's duration plus four hours.
 How they are signed is described under xref:api-guide.adoc#media_server[Media server].
+The media server also answers the Default Media Receiver of Google Cast, so a viewer can cast the same addresses to a Chromecast; ``Settings.castingEnabled`` (admins, ``settingsUpdate``) says whether the web offers it.
 Progress (``progressSave``) and the watch list are per user.
 ``videoMarkWatched`` marks a video as watched, starting from the beginning next time; ``progressClear`` forgets the position, which takes the video off ``continueWatching``.
 
@@ -129,6 +130,8 @@ Editors create and change collections (``collectionCreate``, ``collectionUpdate`
 ``Video.credits`` lists who takes part, in order: a name and, optionally, what they do or play; editors replace them with ``creditsSet``, which leaves out rows without a name.
 ``credits`` lists everyone credited, by name with their number of videos, and ``creditVideos(name)`` their videos with their roles; names are matched regardless of case.
 ``Video.next`` is what plays after a video: the next listed video in its first collection, by title, that has one after it, else the next listed video of the same main spex, revivals counting as their original, by kind and performance date.
+
+``featuredVideo`` is the video at the top of the start page: the one an admin picked (``Settings.featuredVideoId``) while it is listed, else the newest listed video of the default kind, by year and then by when it was published, else the most recently published one.
 
 Viewers rate videos from 1 to 5 (``videoRate``; 0 removes the rating).
 ``Video.myRating`` is the caller's own, ``averageRating`` and ``ratingCount`` everyone's, and ``highestRated`` lists what the caller rated highest.

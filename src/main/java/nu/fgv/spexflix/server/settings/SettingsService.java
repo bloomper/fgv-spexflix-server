@@ -20,12 +20,14 @@ import nu.fgv.spexflix.server.audit.AuditService;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
+import nu.fgv.spexflix.server.video.VideoRepository;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Clock;
+import java.util.UUID;
 
 /**
  * Reads and changes the settings.
@@ -37,13 +39,15 @@ import java.time.Clock;
 public class SettingsService {
 
     private final SettingsRepository repository;
+    private final VideoRepository videoRepository;
     private final CallerService callerService;
     private final AuditService auditService;
     private final Clock clock;
 
-    public SettingsService(final SettingsRepository repository, final CallerService callerService,
-                           final AuditService auditService, final Clock clock) {
+    public SettingsService(final SettingsRepository repository, final VideoRepository videoRepository,
+                           final CallerService callerService, final AuditService auditService, final Clock clock) {
         this.repository = repository;
+        this.videoRepository = videoRepository;
         this.callerService = callerService;
         this.auditService = auditService;
         this.clock = clock;
@@ -54,8 +58,8 @@ public class SettingsService {
     }
 
     private static SettingsDto toDto(final Settings settings) {
-        return new SettingsDto(settings.getWelcomeSv(), settings.getWelcomeEn(), settings.getMaxUploadGb(),
-                settings.isKeepOriginals());
+        return new SettingsDto(settings.getWelcomeSv(), settings.getWelcomeEn(), settings.getFeaturedVideoId(),
+                settings.getMaxUploadGb(), settings.isKeepOriginals(), settings.isCastingEnabled());
     }
 
     /**
@@ -81,10 +85,19 @@ public class SettingsService {
             throw new BadRequestException("error.settings.invalid");
         }
 
+        final UUID featured = input.featuredVideoId();
+
+        // Any video outside the trash: the start page shows it only while it is published and ready
+        if (featured != null && videoRepository.findByUuid(featured).filter(video -> video.getTrashedAt() == null).isEmpty()) {
+            throw new BadRequestException("error.settings.featuredVideo");
+        }
+
         final Settings settings = repository.findById(Settings.ID).orElseGet(Settings::new);
 
         settings.setWelcomeSv(text(input.welcomeSv()));
         settings.setWelcomeEn(text(input.welcomeEn()));
+        settings.setFeaturedVideoId(featured);
+        settings.setCastingEnabled(input.castingEnabled());
         settings.setMaxUploadGb(input.maxUploadGb());
         settings.setKeepOriginals(input.keepOriginals());
         settings.setLastModifiedBy(caller.subject());
@@ -96,8 +109,11 @@ public class SettingsService {
 
     /**
      * The settings as the GraphQL API shows and takes them.
+     *
+     * @param featuredVideoId the video at the top of the start page, or null for the newest show
+     * @param castingEnabled  whether the player offers casting to a Chromecast
      */
-    public record SettingsDto(@Nullable String welcomeSv, @Nullable String welcomeEn, int maxUploadGb,
-                              boolean keepOriginals) {
+    public record SettingsDto(@Nullable String welcomeSv, @Nullable String welcomeEn, @Nullable UUID featuredVideoId,
+                              int maxUploadGb, boolean keepOriginals, boolean castingEnabled) {
     }
 }
