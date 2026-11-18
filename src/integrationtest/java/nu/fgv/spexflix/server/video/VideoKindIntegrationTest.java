@@ -33,9 +33,9 @@ class VideoKindIntegrationTest extends AbstractIntegrationTest {
     private static final String NUMBER = "00000000-0000-7000-8000-00000000b002";
 
     @Test
-    void theMigrationStartsWithFiveKindsAndShowIsTheDefault() {
+    void theMigrationStartsWithSixKindsAndShowIsTheDefault() {
         graphQl(VIEWER).document("{ videoKinds { id nameSv nameEn isDefault } }").execute()
-                .path("videoKinds[*].nameEn").entityList(String.class).containsExactly("Show", "Number", "Trailer", "Behind the scenes", "Other")
+                .path("videoKinds[*].nameEn").entityList(String.class).containsExactly("Show", "Busk show", "Number", "Trailer", "Behind the scenes", "Other")
                 .path("videoKinds[0].isDefault").entity(Boolean.class).isEqualTo(true)
                 .path("videoKinds[1].isDefault").entity(Boolean.class).isEqualTo(false);
 
@@ -53,7 +53,7 @@ class VideoKindIntegrationTest extends AbstractIntegrationTest {
         final String jubilee = graphQl(ADMIN)
                 .document("mutation { videoKindCreate(input: {nameSv: \"Jubileum\", nameEn: \"Jubilee\"}) { id position } }")
                 .execute()
-                .path("videoKindCreate.position").entity(Integer.class).isEqualTo(6)
+                .path("videoKindCreate.position").entity(Integer.class).isEqualTo(7)
                 .path("videoKindCreate.id").entity(String.class).get();
         final String videoId = graphQl(EDITOR)
                 .document("mutation($kind: ID) { videoCreate(input: {title: \"Jubileumsfilmen\", kindId: $kind}) { id kind { nameSv } } }")
@@ -70,7 +70,7 @@ class VideoKindIntegrationTest extends AbstractIntegrationTest {
                 .path("videoUpdate.kind.id").entity(String.class).isEqualTo(jubilee);
 
         graphQl(ADMIN).document("{ videoKinds { nameEn videoCount } }").execute()
-                .path("videoKinds[5].videoCount").entity(Integer.class).isEqualTo(1);
+                .path("videoKinds[6].videoCount").entity(Integer.class).isEqualTo(1);
         expectError(graphQl(ADMIN).document("mutation($id: ID!) { videoKindDelete(id: $id) }").variable("id", jubilee).execute(), "CONFLICT");
     }
 

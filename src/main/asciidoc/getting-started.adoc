@@ -102,7 +102,7 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |API_IMPORT_SAMPLE_DATA|A flag determining whether to import sample data or not|false
 |API_SAMPLE_DATA_SIZE|``small`` (about 15 videos) or ``large`` (about 300)|small
 |API_SAMPLE_DATA_PREPROCESSED|A flag making the import process the sample videos itself, so they are ready when the API has started|false
-|SPEXFLIX_WEB_ORIGIN|The web origin the media server allows (CORS)|http://localhost:3003
+|SPEXFLIX_WEB_ORIGIN|The web origin the media server allows (CORS), besides Google Cast's receiver (``https://www.gstatic.com``)|http://localhost:3003
 |API_BASE_URL|The API's public address; the MCP endpoint's address, the audience of MCP tokens, is this with ``/api/mcp``|https://api.spexflix.fgv.local.nu:8443
 |API_WEB_URL|Spexflix Web's address, for the links MCP tools return; empty for none|http://localhost:3003 (profile ``local``), else empty
 |API_KEYCLOAK_MCP_CLIENT_ID|The Keycloak client whose tokens the MCP endpoint accepts|fgv-spexflix-mcp

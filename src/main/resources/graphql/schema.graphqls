@@ -4,8 +4,10 @@ scalar Void
 type Query {
     "Anyone logged in. The caller and their roles."
     me: Me!
-    "USER. The start page texts and the upload limit."
+    "USER. The start page texts, its featured video, whether casting is offered, and the upload limit."
     settings: Settings!
+    "USER. The video at the top of the start page: the one an admin picked while it is listed, else the newest listed video of the default kind (by year, then by when it was published), else the most recently published one. Null when no video is listed."
+    featuredVideo: Video
     "USER. Videos by year, newest first, or in the filter's order. Unpublished, processing and failed ones only for EDITOR, when asked for."
     videos(filter: VideoFilter): [Video!]!
     "USER. A video; unpublished, unprocessed or trashed ones only for EDITOR."
@@ -150,16 +152,23 @@ type Me {
 type Settings {
     welcomeSv: String
     welcomeEn: String
+    "The video an admin picked for the top of the start page, or null for the newest show (see featuredVideo)."
+    featuredVideoId: ID
     maxUploadGb: Int!
     "Whether originals are kept after processing, as the archive copy."
     keepOriginals: Boolean!
+    "Whether the player offers casting to a Chromecast."
+    castingEnabled: Boolean!
 }
 
 input SettingsInput {
     welcomeSv: String
     welcomeEn: String
+    "A video outside the trash, or null for the newest show."
+    featuredVideoId: ID
     maxUploadGb: Int!
     keepOriginals: Boolean!
+    castingEnabled: Boolean! = true
 }
 
 "What a video is, e.g. a full show or a trailer. Configured by admins."
@@ -167,6 +176,8 @@ type VideoKind {
     id: ID!
     nameSv: String!
     nameEn: String!
+    "Other spellings the import recognises."
+    aliases: [String!]!
     position: Int!
     "The first by position: used for new videos."
     isDefault: Boolean!
@@ -177,6 +188,8 @@ type VideoKind {
 input VideoKindInput {
     nameSv: String!
     nameEn: String!
+    "Null leaves them as they are."
+    aliases: [String!]
 }
 
 enum VideoStatus {
@@ -556,4 +569,85 @@ type SpexipediaVideo {
     title: String!
     "The spex asked for that the video is about."
     spexId: ID
+}
+
+# The import API (spec 5.8; Spexipedia's docs/content-import.md, section 4) ---------------------------------------------
+# IMPORT only. Files are uploaded first to PUT /api/import/files/{sha256} and referred to by their hash. Everything
+# arrives unpublished; videos are processed as uploads are.
+
+extend type Mutation {
+    "IMPORT. Imports videos and collections: new source keys create, known ones update what they made unless an editor has changed it since. With dryRun nothing is kept. At most 500 records."
+    importBatch(input: ImportBatchInput!, dryRun: Boolean! = false): ImportResult!
+    "IMPORT. Removes what was imported under the source prefix and is still unpublished and unchanged; returns how many."
+    importForget(sourcePrefix: String!): Int!
+}
+
+input ImportBatchInput {
+    "Whether video kinds nobody knows become new kinds, instead of failing the record."
+    createMissingKinds: Boolean = false
+    videos: [ImportVideoInput!]
+    collections: [ImportCollectionInput!]
+}
+
+input ImportFileRefInput {
+    sha256: String!
+    "The file's name, for its extension."
+    name: String
+}
+
+"A video of spex in Spexipedia, of a video kind by name or alias, with its original. The original is moved out of the import's store, not copied."
+input ImportVideoInput {
+    sourceKey: String!
+    spexIds: [ID!]
+    kind: String
+    title: String
+    year: Int
+    performance: String
+    "yyyy-mm-dd"
+    performanceDate: String
+    description: String
+    file: ImportFileRefInput!
+    "Replaces the video's chapters when given."
+    chapters: [ImportChapterInput!]
+}
+
+input ImportChapterInput {
+    startSeconds: Int!
+    title: String!
+}
+
+"A collection of videos imported with videoSourceKeys, in order, e.g. the acts of one show."
+input ImportCollectionInput {
+    sourceKey: String!
+    title: String!
+    description: String
+    videoSourceKeys: [String!]!
+}
+
+type ImportResult {
+    dryRun: Boolean!
+    items: [ImportItem!]!
+    created: Int!
+    updated: Int!
+    unchanged: Int!
+    kept: Int!
+    failed: Int!
+}
+
+type ImportItem {
+    kind: String!
+    sourceKey: String!
+    id: ID
+    outcome: ImportOutcome!
+    message: String
+    warnings: [String!]!
+}
+
+enum ImportOutcome {
+    CREATED
+    UPDATED
+    UNCHANGED
+    "An editor changed or removed the record since it was imported, so the import left it alone."
+    KEPT
+    FAILED
 }

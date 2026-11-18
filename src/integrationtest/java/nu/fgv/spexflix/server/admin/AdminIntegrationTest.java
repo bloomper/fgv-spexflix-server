@@ -25,7 +25,8 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * What editors and admins see of the processing queue, the storage and the settings, and the trash.
+ * What editors and admins see of the processing queue, the storage and the settings, the start page's featured video,
+ * and the trash.
  *
  * @author Anders Jacobsson
  * @since 1.0
@@ -60,6 +61,31 @@ class AdminIntegrationTest extends AbstractIntegrationTest {
         graphQl(VIEWER).document("{ settings { welcomeSv keepOriginals } }").execute()
                 .path("settings.welcomeSv").entity(String.class).isEqualTo("Hej")
                 .path("settings.keepOriginals").entity(Boolean.class).isEqualTo(false);
+    }
+
+    @Test
+    void anAdminPicksTheFeaturedVideoAndTurnsCastingOff() throws Exception {
+        final String first = readyVideo(folder, true);
+        final String second = readyVideo(folder, true);
+
+        // Both are shows of the same year: the one published last is the newest
+        graphQl(VIEWER).document("{ featuredVideo { id } settings { featuredVideoId castingEnabled } }").execute()
+                .path("featuredVideo.id").entity(String.class).isEqualTo(second)
+                .path("settings.featuredVideoId").valueIsNull()
+                .path("settings.castingEnabled").entity(Boolean.class).isEqualTo(true);
+
+        graphQl(ADMIN).document("mutation($id: ID!) { settingsUpdate(input: {featuredVideoId: $id, maxUploadGb: 50, keepOriginals: true, castingEnabled: false}) { featuredVideoId } }")
+                .variable("id", first).execute()
+                .path("settingsUpdate.featuredVideoId").entity(String.class).isEqualTo(first);
+        graphQl(VIEWER).document("{ featuredVideo { id } settings { featuredVideoId castingEnabled } }").execute()
+                .path("featuredVideo.id").entity(String.class).isEqualTo(first)
+                .path("settings.castingEnabled").entity(Boolean.class).isEqualTo(false);
+
+        // An unpublished pick is not shown, and a video that does not exist cannot be picked
+        graphQl(EDITOR).document("mutation($id: ID!) { videoPublish(id: $id, published: false) { id } }").variable("id", first).execute().errors().verify();
+        graphQl(VIEWER).document("{ featuredVideo { id } }").execute().path("featuredVideo.id").entity(String.class).isEqualTo(second);
+        expectError(graphQl(ADMIN).document("mutation { settingsUpdate(input: {featuredVideoId: \"00000000-0000-7000-8000-0000000000ff\", maxUploadGb: 50, keepOriginals: true}) { maxUploadGb } }")
+                .execute(), "BAD_REQUEST");
     }
 
     @Test

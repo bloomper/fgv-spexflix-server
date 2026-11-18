@@ -51,10 +51,13 @@ public class VideoGraphqlApi {
     private final PlaybackService playbackService;
     private final ProcessingService processingService;
     private final SpexService spexService;
+    private final FeaturedVideoService featuredVideoService;
 
     public VideoGraphqlApi(final VideoService service, final PlaybackService playbackService,
-                           final ProcessingService processingService, final SpexService spexService) {
+                           final ProcessingService processingService, final SpexService spexService,
+                           final FeaturedVideoService featuredVideoService) {
         this.service = service;
+        this.featuredVideoService = featuredVideoService;
         this.playbackService = playbackService;
         this.processingService = processingService;
         this.spexService = spexService;
@@ -84,6 +87,11 @@ public class VideoGraphqlApi {
     @QueryMapping
     public List<VideoDto> recentVideos(@Argument final @Nullable Integer limit) {
         return service.recent(limit == null ? 12 : limit);
+    }
+
+    @QueryMapping
+    public @Nullable VideoDto featuredVideo() {
+        return featuredVideoService.featured();
     }
 
     @QueryMapping

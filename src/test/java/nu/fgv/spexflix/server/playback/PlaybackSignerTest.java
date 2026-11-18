@@ -35,7 +35,7 @@ class PlaybackSignerTest {
 
     @Test
     void buildsAPrefixForOneVideo() {
-        final PlaybackSigner signer = new PlaybackSigner(new SpexflixProperties(null, null, null,
+        final PlaybackSigner signer = new PlaybackSigner(new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(null, null, "https://media.example.org/", "secret", Duration.ofHours(4)),
                 null, null, null, null));
 
@@ -45,7 +45,7 @@ class PlaybackSignerTest {
 
     @Test
     void refusesToStartWithoutAKey() {
-        assertThatThrownBy(() -> new PlaybackSigner(new SpexflixProperties(null, null, null,
+        assertThatThrownBy(() -> new PlaybackSigner(new SpexflixProperties(null, null, null, null,
                 new SpexflixProperties.Media(null, null, "https://media.example.org/", " ", Duration.ofHours(4)),
                 null, null, null, null)))
                 .isInstanceOf(IllegalStateException.class)

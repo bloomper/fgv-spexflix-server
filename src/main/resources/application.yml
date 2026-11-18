@@ -94,6 +94,10 @@ logging:
 
 spexflix:
   # The API's public address, e.g. the MCP endpoint's audience
+  imports:
+    # Files received through the import API (Spexipedia's docs/content-import.md, section 4)
+    root: ${API_IMPORTS_ROOT:./data/imports}
+    keep-files: 7d
   base-url: ${API_BASE_URL:https://api.spexflix.fgv.local.nu:8443}
   # Spexflix Web, for links to its pages; empty for none
   web-url: ${API_WEB_URL:}
@@ -109,7 +113,7 @@ spexflix:
     url: ${API_KEYCLOAK_URL:https://auth.fgv.local.nu:8443/auth}
     realm: ${API_KEYCLOAK_REALM:fgv}
   security:
-    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service,fgv-spexipedia-service}
+    authorized-parties: ${API_SECURITY_AUTHORIZED_PARTIES:fgv-spexflix,fgv-spexify-service,fgv-spexipedia-service,fgv-content-migration}
   mcp:
     # Only tokens of MCP clients, never the web's, are accepted at /api/mcp
     authorized-parties: ${API_KEYCLOAK_MCP_CLIENT_ID:fgv-spexflix-mcp}

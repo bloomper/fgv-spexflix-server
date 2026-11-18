@@ -26,6 +26,7 @@ import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * The one row of settings.
@@ -50,11 +51,23 @@ public class Settings {
     @Column(name = "welcome_en")
     private @Nullable String welcomeEn;
 
+    /**
+     * The video at the top of the start page; the newest show when none is picked.
+     */
+    @Column(name = "featured_video_uuid", length = 36)
+    private @Nullable UUID featuredVideoId;
+
     @Column(name = "max_upload_gb", nullable = false)
     private int maxUploadGb = 50;
 
     @Column(name = "keep_originals", nullable = false)
     private boolean keepOriginals = true;
+
+    /**
+     * Whether the player offers casting to a Chromecast.
+     */
+    @Column(name = "casting_enabled", nullable = false)
+    private boolean castingEnabled = true;
 
     @Version
     private Long version;

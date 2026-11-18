@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TranscoderTest {
 
-    private static final SpexflixProperties PROPERTIES = new SpexflixProperties(null, null, null, null,
+    private static final SpexflixProperties PROPERTIES = new SpexflixProperties(null, null, null, null, null,
             new SpexflixProperties.Worker(true, 10), null, null, null);
 
     private static boolean hasFfmpeg() {
