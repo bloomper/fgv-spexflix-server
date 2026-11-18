@@ -71,6 +71,13 @@ class SampleDataImporterIntegrationTest extends AbstractIntegrationTest {
         // Chapters link to Spexify's track for Nobel, which the stand-in for Spexify has
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM chapter WHERE spexify_track_id = '00000000-0000-7000-8000-000000000011'").query(Long.class).single()).isPositive();
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM subtitle").query(Long.class).single()).isPositive();
+        // Every kind the migrations seed has videos, with their aliases kept; the admin has picked a featured video
+        assertThat(jdbcClient.sql("SELECT COUNT(*) FROM video_kind k WHERE NOT EXISTS (SELECT 1 FROM video v WHERE v.kind_id = k.id)")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbcClient.sql("SELECT aliases FROM video_kind WHERE uuid = '00000000-0000-7000-8000-00000000b004'").query(String.class).single())
+                .isNotBlank();
+        assertThat(jdbcClient.sql("SELECT COUNT(*) FROM settings s JOIN video v ON v.uuid = s.featured_video_uuid").query(Long.class).single())
+                .isEqualTo(1);
         // The user's "continue watching" (one started, one finished), plus views to the end by every sample user
         assertThat(jdbcClient.sql("""
                         SELECT COUNT(*) FROM watch_progress p JOIN app_user u ON u.id = p.user_id WHERE u.username = ? AND p.finished = 0""")

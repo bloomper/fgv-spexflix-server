@@ -43,6 +43,8 @@ import nu.fgv.spexflix.server.spex.SpexipediaClient;
 import nu.fgv.spexflix.server.spexify.SpexifyClient;
 import nu.fgv.spexflix.server.user.AppUser;
 import nu.fgv.spexflix.server.user.AppUserRepository;
+import nu.fgv.spexflix.server.settings.Settings;
+import nu.fgv.spexflix.server.settings.SettingsRepository;
 import nu.fgv.spexflix.server.video.Chapter;
 import nu.fgv.spexflix.server.video.Credit;
 import nu.fgv.spexflix.server.video.SpexRef;
@@ -111,7 +113,7 @@ public class SampleDataImporter {
     private static final int SPEXIPEDIA_ATTEMPTS = 30;
     private static final Duration SPEXIPEDIA_RETRY_INTERVAL = Duration.ofSeconds(10);
     private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "playlist_item", "playlist", "video_like", "video_credit", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
-            "chapter", "subtitle", "rendition", "video", "video_kind", "upload_session", "app_user");
+            "chapter", "subtitle", "rendition", "video", "upload_session", "app_user");
     /** Sample cast and crew, with what they do or play; each show credits some of them. */
     private static final List<String[]> CREDITS = List.of(
             new String[]{"Anna Andersson", "Kleopatra"}, new String[]{"Bertil Berg", "Caesar"},
@@ -152,6 +154,7 @@ public class SampleDataImporter {
     private final ProcessingWorker worker;
     private final VideoRepository videoRepository;
     private final VideoKindRepository videoKindRepository;
+    private final SettingsRepository settingsRepository;
     private final VideoCollectionRepository collectionRepository;
     private final ProcessingJobRepository jobRepository;
     private final AppUserRepository userRepository;
@@ -168,7 +171,7 @@ public class SampleDataImporter {
                               final TransactionTemplate transactionTemplate, final SpexipediaClient spexipediaClient,
                               final SpexService spexService, final SpexifyClient spexifyClient,
                               final MediaStorage storage, final Ffmpeg ffmpeg, final ProcessingWorker worker,
-                              final VideoRepository videoRepository, final VideoKindRepository videoKindRepository,
+                              final VideoRepository videoRepository, final VideoKindRepository videoKindRepository, final SettingsRepository settingsRepository,
                               final VideoCollectionRepository collectionRepository, final ProcessingJobRepository jobRepository,
                               final AppUserRepository userRepository, final WatchProgressRepository progressRepository,
                               final VideoRatingRepository ratingRepository, final VideoLikeRepository likeRepository,
@@ -187,6 +190,7 @@ public class SampleDataImporter {
         this.worker = worker;
         this.videoRepository = videoRepository;
         this.videoKindRepository = videoKindRepository;
+        this.settingsRepository = settingsRepository;
         this.collectionRepository = collectionRepository;
         this.jobRepository = jobRepository;
         this.userRepository = userRepository;
@@ -209,25 +213,12 @@ public class SampleDataImporter {
     }
 
     /**
-     * The kinds a new database starts with, as in the migration: show (the default), number, trailer, behind the
-     * scenes and other.
+     * The kinds the migrations seed, with their aliases (show first, the default, then busk show, number, trailer,
+     * behind the scenes and other); kinds an admin added are removed.
      */
     private List<VideoKind> createKinds() {
-        final String[][] names = {{"Föreställning", "Show"}, {"Nummer", "Number"}, {"Trailer", "Trailer"},
-                {"Bakom kulisserna", "Behind the scenes"}, {"Övrigt", "Other"}};
-        final List<VideoKind> kinds = new ArrayList<>();
-
-        for (int i = 0; i < names.length; i++) {
-            final VideoKind kind = new VideoKind();
-
-            kind.setUuid(UUID.fromString("00000000-0000-7000-8000-00000000b00" + (i + 1)));
-            kind.setNameSv(names[i][0]);
-            kind.setNameEn(names[i][1]);
-            kind.setPosition(i + 1);
-            kind.setCreatedBy("system");
-            kinds.add(videoKindRepository.save(kind));
-        }
-        return kinds;
+        jdbcTemplate.update("DELETE FROM video_kind WHERE created_by <> 'system'");
+        return videoKindRepository.findAllByOrderByPositionAscIdAsc();
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -295,6 +286,13 @@ public class SampleDataImporter {
             transactionTemplate.executeWithoutResult(_ -> createCommunity(List.of(users.get(ADMIN), users.get(EDITOR), users.get(USER))));
             transactionTemplate.executeWithoutResult(_ -> createPlaylist(users.get(USER)));
             transactionTemplate.executeWithoutResult(_ -> createCollection());
+            // The admin's pick at the top of the start page: the second show, not the newest
+            transactionTemplate.executeWithoutResult(_ -> {
+                final Settings settings = settingsRepository.findById(Settings.ID).orElseGet(Settings::new);
+
+                settings.setFeaturedVideoId(UUID.nameUUIDFromBytes("spexflix-sample-video-1".getBytes(StandardCharsets.UTF_8)));
+                settingsRepository.save(settings);
+            });
             transactionTemplate.executeWithoutResult(_ -> createAudit(users.get(EDITOR)));
         } finally {
             FileSystemUtils.deleteRecursively(sourcesFolder);
@@ -374,7 +372,9 @@ public class SampleDataImporter {
                              final SampleVideos.Source source, final boolean queue) {
         final SpexDto picked = spex.get(index % spex.size());
         final Video video = new Video();
-        final VideoKind kind = kinds.get(index < spex.size() ? 0 : index % kinds.size());
+        // Every third video is of another kind than a show, in turn, as the content migration brings in dances
+        // (behind the scenes), busk shows and the rest
+        final VideoKind kind = index % 3 == 2 ? kinds.get(1 + (index / 3) % (kinds.size() - 1)) : kinds.getFirst();
         final boolean show = kind == kinds.getFirst();
 
         video.setUuid(UUID.nameUUIDFromBytes(("spexflix-sample-video-" + index).getBytes(StandardCharsets.UTF_8)));

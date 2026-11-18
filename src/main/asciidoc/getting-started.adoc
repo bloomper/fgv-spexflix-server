@@ -185,6 +185,7 @@ The import records them by their fixed ids and never asks Keycloak, so it needs 
 The import generates originals with ffmpeg, one per path through processing (H.264 1080p copied, H.264 720p, VP9 re-encoded, interlaced MPEG-2 deinterlaced, a file that is not video), builds about 15 videos (about 300 with ``API_SAMPLE_DATA_SIZE=large``) with chapters, subtitles, viewing history and audit entries, and queues them for the worker.
 With ``API_SAMPLE_DATA_PREPROCESSED=true`` it processes each distinct original itself instead, so every video is ready when the API has started.
 Chapters are linked to Spexify's sample tracks when Spexify runs with its sample data and ``API_SPEXIFY_GRAPHQL_URL`` is set.
+Every third video is of another kind than a show, in turn (busk show, number, trailer, behind the scenes, other), as the content migration brings them in; the kinds are the migrations' own, with their aliases. The admin has picked the second show as the featured video at the top of the start page.
 
 [[keycloak]]
 == Keycloak
