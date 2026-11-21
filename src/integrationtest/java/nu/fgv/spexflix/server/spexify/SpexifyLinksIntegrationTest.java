@@ -63,6 +63,11 @@ class SpexifyLinksIntegrationTest extends AbstractIntegrationTest {
                 .path("chapterLinks[0].videoId").entity(String.class).isEqualTo(videoId)
                 .path("chapterLinks[0].chapterTitle").entity(String.class).isEqualTo("Ouvertyr")
                 .path("chapterLinks[0].startSeconds").entity(Integer.class).isEqualTo(0);
+        // Spexipedia shows them beside the number's tracks
+        graphQlWithToken(serviceToken("fgv-spexipedia-service"))
+                .document("{ chapterLinks(trackIds: [\"00000000-0000-7000-8000-000000000011\"]) { videoId } }")
+                .execute()
+                .path("chapterLinks[0].videoId").entity(String.class).isEqualTo(videoId);
 
         graphQl(EDITOR).document("mutation($id: ID!) { videoPublish(id: $id, published: false) { id } }").variable("id", videoId).execute();
         graphQlWithToken(spexifyServiceToken())

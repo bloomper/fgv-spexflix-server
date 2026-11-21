@@ -50,7 +50,7 @@ type Query {
     spexSearch(q: String!): [Spex!]!
     "EDITOR. The published Spexify tracks of the video's spex and their originals' revivals, for linking chapters; empty when Spexify is unavailable."
     spexifyTracks(videoId: ID!): [SpexifyTrack!]!
-    "SPEXIFY or USER. Chapters of published videos linked to the given Spexify tracks."
+    "SPEXIFY, SPEXIPEDIA or USER. Chapters of published videos linked to the given Spexify tracks."
     chapterLinks(trackIds: [ID!]!): [ChapterLink!]!
     "EDITOR. Trashed videos."
     trash: [Video!]!
