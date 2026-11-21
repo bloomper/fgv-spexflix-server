@@ -65,19 +65,24 @@ public class SecurityConfig {
     public SecurityFilterChain mcpSecurityFilterChain(final HttpSecurity http,
                                                       @Value("${spring.ai.mcp.server.streamable-http.mcp-endpoint}") final String mcpEndpoint,
                                                       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") final String issuerUri,
+                                                      @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") final String jwkSetUri,
                                                       @Value("${spexflix.mcp.authorized-parties}") final List<String> authorizedParties,
                                                       @Value("${spexflix.base-url}") final String baseUrl,
                                                       final JwtAuthenticationConverter jwtAuthenticationConverter) {
         final String resource = UriComponentsBuilder.fromUriString(baseUrl).replacePath(mcpEndpoint).build().toUriString();
         final JwtDecoder jwtDecoder = new SupplierJwtDecoder(() -> {
-            final NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+            // In a container Keycloak's keys are read inside the network, as for the rest of the API
+            final NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
+                    ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
+                    : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
 
             decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                     JwtValidators.createDefaultWithIssuer(issuerUri),
                     new JwtAudienceValidator(resource),
                     new JwtClaimValidator<String>("azp", authorizedParties::contains),
                     accessTokenTypeValidator(),
-                    new JwtClaimValidator<String>(JwtClaimNames.SUB, StringUtils::hasText)
+                    new JwtClaimValidator<String>(JwtClaimNames.SUB, StringUtils::hasText),
+                    new JwtClaimValidator<String>("email", StringUtils::hasText)
             ));
             return decoder;
         });
