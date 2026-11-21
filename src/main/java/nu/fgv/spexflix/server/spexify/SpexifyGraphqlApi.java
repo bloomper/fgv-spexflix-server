@@ -74,8 +74,9 @@ public class SpexifyGraphqlApi {
     public List<ChapterLinkDto> chapterLinks(@Argument final List<UUID> trackIds) {
         final Caller caller = callerService.current();
 
-        if (!caller.isSpexifyService() && !caller.isUser()) {
-            throw new AccessDeniedException("SPEXIFY or USER required");
+        // Spexipedia shows a number's chapters beside its tracks (fgv-infra-deploy docs/data-ownership.md)
+        if (!caller.isSpexifyService() && !caller.isSpexipediaService() && !caller.isUser()) {
+            throw new AccessDeniedException("SPEXIFY, SPEXIPEDIA or USER required");
         }
         if (trackIds.isEmpty() || trackIds.size() > 500) {
             return List.of();
