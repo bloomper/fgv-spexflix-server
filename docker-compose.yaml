@@ -28,7 +28,7 @@ services:
       - FGV_SPEXFLIX_MYSQL_USER_PASSWORD
 
   spexflix-media:
-    image: 'nginx:1.29-alpine'
+    image: 'nginx:1.30-alpine'
     restart: unless-stopped
     command:
       - sh
