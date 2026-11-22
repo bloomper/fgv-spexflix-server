@@ -19,6 +19,7 @@ package nu.fgv.spexflix.server.settings;
 import nu.fgv.spexflix.server.TestCallers;
 import nu.fgv.spexflix.server.TestClock;
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.settings.SettingsService.SettingsDto;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
@@ -80,7 +81,7 @@ class SettingsServiceTest {
 
         assertThat(service.update(new SettingsDto("  Välkommen!  ", " ", null, 80, false, false)))
                 .isEqualTo(new SettingsDto("Välkommen!", null, null, 80, false, false));
-        verify(auditService).record("UPDATE", "SETTINGS", null, "Ändrade inställningarna");
+        verify(auditService).record("UPDATE", "SETTINGS", null, StoredText.of("audit.settings.update"));
     }
 
     @Test

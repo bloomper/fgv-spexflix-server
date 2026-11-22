@@ -17,6 +17,8 @@
 package nu.fgv.spexflix.server.processing;
 
 import lombok.extern.slf4j.Slf4j;
+import nu.fgv.spexflix.server.util.StoredText;
+import nu.fgv.spexflix.server.util.TextException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.FileSystemUtils;
@@ -230,7 +232,7 @@ public class Transcoder {
     public static class NotVideoException extends IOException {
 
         public NotVideoException() {
-            super("The file is not video that can be read");
+            super("processing.failed.notVideo", new TextException(StoredText.of("processing.failed.notVideo")));
         }
     }
 }

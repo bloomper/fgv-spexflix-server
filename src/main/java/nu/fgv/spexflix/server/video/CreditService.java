@@ -17,6 +17,7 @@
 package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
@@ -171,7 +172,7 @@ public class CreditService {
         }
         video.getCredits().clear();
         video.getCredits().addAll(credits);
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), "Ändrade de medverkande i " + video.getTitle());
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.credits", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 

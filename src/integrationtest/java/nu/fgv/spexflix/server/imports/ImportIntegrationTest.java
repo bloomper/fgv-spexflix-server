@@ -88,4 +88,16 @@ class ImportIntegrationTest extends AbstractIntegrationTest {
         graphQlWithToken(serviceToken(MIGRATION)).document("mutation { importForget(sourcePrefix: \"test:\") }").execute()
                 .path("importForget").entity(Integer.class).isEqualTo(2);
     }
+
+    @Test
+    void aRecordsMessageIsInTheLanguageAskedFor() {
+        graphQlWithToken(serviceToken(MIGRATION)).document("""
+                        mutation($input: ImportBatchInput!) { importBatch(input: $input, dryRun: true) {
+                            items { outcome sv: message(locale: "sv") en: message(locale: "en") }
+                        } }""")
+                .variable("input", Map.of("collections", List.of(Map.of("sourceKey", " ", "title", "Cleopatra", "videoSourceKeys", List.of())))).execute()
+                .path("importBatch.items[0].outcome").entity(String.class).isEqualTo("FAILED")
+                .path("importBatch.items[0].sv").entity(String.class).isEqualTo("Fältet sourceKey är tomt, för långt eller ogiltigt.")
+                .path("importBatch.items[0].en").entity(String.class).isEqualTo("The field sourceKey is empty, too long or invalid.");
+    }
 }

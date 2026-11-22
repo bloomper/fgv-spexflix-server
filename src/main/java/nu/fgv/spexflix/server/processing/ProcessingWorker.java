@@ -19,6 +19,8 @@ package nu.fgv.spexflix.server.processing;
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
 import nu.fgv.spexflix.server.settings.SettingsService;
+import nu.fgv.spexflix.server.util.StoredText;
+import nu.fgv.spexflix.server.util.TextException;
 import nu.fgv.spexflix.server.video.Rendition;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoRepository;
@@ -99,7 +101,7 @@ public class ProcessingWorker {
                 job.setStatus(job.getAttempts() >= MAX_ATTEMPTS ? JobStatus.FAILED : JobStatus.QUEUED);
                 job.setLeaseUntil(null);
                 if (job.getStatus() == JobStatus.FAILED) {
-                    job.setError("Stopped " + MAX_ATTEMPTS + " times");
+                    job.setError(StoredText.of("processing.failed.stopped", MAX_ATTEMPTS).encode(MAX_ERROR));
                 }
             }
         });
@@ -203,9 +205,7 @@ public class ProcessingWorker {
         transactionTemplate.executeWithoutResult(_ -> {
             final ProcessingJob job = jobRepository.findById(jobId).orElseThrow();
             final Video video = job.getVideo();
-            final String message = e instanceof Transcoder.NotVideoException ? e.getMessage()
-                    : String.valueOf(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
-            final String error = message.length() > MAX_ERROR ? message.substring(0, MAX_ERROR) : message;
+            final String error = TextException.text(e).encode(MAX_ERROR);
 
             job.setStatus(JobStatus.FAILED);
             job.setError(error);

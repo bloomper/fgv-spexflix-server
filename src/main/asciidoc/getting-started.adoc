@@ -74,15 +74,15 @@ $ ./scripts/configure-keycloak.sh    # the Keycloak client secrets, read from th
 
 Both keep the values that are already set, so they can be run again, and tell git to leave your values alone so they are never committed (``git update-index --skip-worktree .docker/secrets/*``).
 The database passwords take effect only when the databases are created, i.e. with empty data folders.
-To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 'verysecret' > .docker/secrets/FGV_SPEXFLIX_MYSQL_ROOT_PASSWORD``.
+To set a value by hand, write it without a trailing newline, e.g. ``printf '%s' 'verysecret' > .docker/secrets/MYSQL_ROOT_PASSWORD``.
 
 To see a changed placeholder after a pull, undo it with ``git update-index --no-skip-worktree .docker/secrets/*``.
 
 |===
 |Parameter|Purpose|Comment|Example value
 
-|FGV_SPEXFLIX_MYSQL_ROOT_PASSWORD|The password for the root user of Spexflix Server's database||verysecret
-|FGV_SPEXFLIX_MYSQL_USER_PASSWORD|The password for the user of Spexflix Server's database||secret
+|MYSQL_ROOT_PASSWORD|The password for the root user of Spexflix Server's database||verysecret
+|MYSQL_USER_PASSWORD|The password for the user of Spexflix Server's database||secret
 |API_KEYCLOAK_SERVICE_CLIENT_SECRET|The client secret of ``fgv-spexflix-service``, with which Spexflix Server calls Spexipedia and Spexify|Must match the value in ``realm/fgv.json`` in fgv-keycloak, search for ``fgv-spexflix-service`` and pick the value for ``secret`` in the same section|
 |API_MEDIA_SIGNING_KEY|Signs the playback addresses, which the media server checks; shared by ``spexflix-api`` and ``spexflix-media``|A long random string, e.g. from ``openssl rand -base64 32``|
 
@@ -93,9 +93,9 @@ There are also configuration parameters in ``.env`` that can be tweaked if so de
 |===
 |Parameter|Purpose|Default value
 
-|FGV_SPEXFLIX_MYSQL_DATABASE|The name of the database used by Spexflix Server|spexflix
-|FGV_SPEXFLIX_MYSQL_ROOT_USER|The root user of Spexflix Server's database|root
-|FGV_SPEXFLIX_MYSQL_USER|The user of Spexflix Server's database|spexflix
+|MYSQL_DATABASE|The name of the database used by Spexflix Server|spexflix
+|MYSQL_ROOT_USER|The root user of Spexflix Server's database|root
+|MYSQL_USER|The user of Spexflix Server's database|spexflix
 |API_KEYCLOAK_REALM|The Keycloak realm of Spexflix Server|fgv
 |API_KEYCLOAK_CLIENT_CLIENT_ID|The Keycloak client id of Spexflix Web|fgv-spexflix
 |API_SPEXIFY_GRAPHQL_URL|Spexify's GraphQL endpoint, for linking chapters to tracks; empty for none|(empty); ``http://spexify-api:8080/api/graphql`` when Spexify runs too
@@ -147,7 +147,7 @@ When the ``spexflix-api`` container isn't running, Caddy forwards ``https://api.
 [source,bash]
 ----
 $ docker compose up -d spexflix-mysql spexflix-media
-$ MYSQL_API_USER_PASSWORD=<FGV_SPEXFLIX_MYSQL_USER_PASSWORD> \
+$ MYSQL_API_USER_PASSWORD=<MYSQL_USER_PASSWORD> \
   API_KEYCLOAK_SERVICE_CLIENT_SECRET=<…> API_MEDIA_SIGNING_KEY=<…> \
   ./gradlew bootRun --args='--spring.profiles.active=local'
 ----
@@ -162,10 +162,21 @@ It finds fgv-infra-deploy in ``../../fgv-infra-deploy``, or where ``INFRA_DEPLOY
 
 The same setup for staging and production is in https://github.com/bloomper/fgv-spexflix-deploy[fgv-spexflix-deploy] and fgv-infra-deploy.
 
+[[local_folders]]
+=== Local folders
+
+Docker Compose keeps everything on the host, under ``.docker``, one folder per service:
+
+* ``.docker/mysql``: the database and its error log
+* ``.docker/api``: the API's logs, media and imports
+* ``.docker/secrets``: the secrets, see <<configuration>>
+
+An API started from the IDE or with ``./gradlew bootRun`` keeps its files in ``./data`` instead. ``spexflix-media`` serves the videos from the API's ``media/hls``. To let the containers see the files of an API started from the IDE, set ``API_DATA=./data`` in ``.env``.
+
 [[media]]
 == Media
 
-Metadata lives in MySQL; files in the media folder (``./data/media``, ``API_MEDIA_ROOT``), never in the database.
+Metadata lives in MySQL; files in the media folder (``API_MEDIA_ROOT``; ``media`` in the API's folder, see <<local_folders>>), never in the database.
 The API writes originals and the worker the HLS renditions, which the media server serves read-only from ``hls/``.
 How videos are processed and played is described in the xref:graphql-api-guide.adoc#videos[GraphQL API guide].
 

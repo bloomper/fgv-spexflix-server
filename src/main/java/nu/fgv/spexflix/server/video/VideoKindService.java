@@ -16,6 +16,7 @@
 package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
@@ -121,7 +122,8 @@ public class VideoKindService {
         kind.setAliases(aliases(input.aliases()));
         kind.setPosition(repository.findAllByOrderByPositionAscIdAsc().stream().mapToInt(VideoKind::getPosition).max().orElse(0) + 1);
         repository.save(kind);
-        auditService.record("CREATE", "VIDEO_KIND", kind.getUuid(), "Skapade filmsorten " + kind.getNameSv());
+        auditService.record("CREATE", "VIDEO_KIND", kind.getUuid(),
+                StoredText.of("audit.videoKind.create", StoredText.of("audit.name", kind.getNameSv(), kind.getNameEn())));
         return toDto(kind);
     }
 
@@ -136,7 +138,8 @@ public class VideoKindService {
         if (input.aliases() != null) {
             kind.setAliases(aliases(input.aliases()));
         }
-        auditService.record("UPDATE", "VIDEO_KIND", kind.getUuid(), "Ändrade filmsorten " + kind.getNameSv());
+        auditService.record("UPDATE", "VIDEO_KIND", kind.getUuid(),
+                StoredText.of("audit.videoKind.update", StoredText.of("audit.name", kind.getNameSv(), kind.getNameEn())));
         return toDto(kind);
     }
 
@@ -155,7 +158,7 @@ public class VideoKindService {
         for (int i = 0; i < ids.size(); i++) {
             byId.get(ids.get(i)).setPosition(i + 1);
         }
-        auditService.record("UPDATE", "VIDEO_KIND", null, "Ändrade ordningen på filmsorterna");
+        auditService.record("UPDATE", "VIDEO_KIND", null, StoredText.of("audit.videoKind.reorder"));
         return ids.stream().map(byId::get).map(VideoKindService::toDto).toList();
     }
 
@@ -173,7 +176,8 @@ public class VideoKindService {
             throw new BadRequestException("error.videoKind.last");
         }
         repository.delete(kind);
-        auditService.record("DELETE", "VIDEO_KIND", kind.getUuid(), "Raderade filmsorten " + kind.getNameSv());
+        auditService.record("DELETE", "VIDEO_KIND", kind.getUuid(),
+                StoredText.of("audit.videoKind.delete", StoredText.of("audit.name", kind.getNameSv(), kind.getNameEn())));
     }
 
     private VideoKind kind(final UUID id) {
@@ -223,7 +227,8 @@ public class VideoKindService {
         kind.setNameEn(kind.getNameSv());
         kind.setPosition(repository.findAllByOrderByPositionAscIdAsc().stream().mapToInt(VideoKind::getPosition).max().orElse(0) + 1);
         repository.save(kind);
-        auditService.record("CREATE", "VIDEO_KIND", kind.getUuid(), "Skapade filmsorten " + kind.getNameSv() + " vid import");
+        auditService.record("CREATE", "VIDEO_KIND", kind.getUuid(),
+                StoredText.of("audit.videoKind.createForImport", StoredText.of("audit.name", kind.getNameSv(), kind.getNameEn())));
         return kind;
     }
 

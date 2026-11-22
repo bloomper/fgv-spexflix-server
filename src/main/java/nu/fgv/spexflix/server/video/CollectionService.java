@@ -16,6 +16,7 @@
 package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
@@ -196,7 +197,7 @@ public class CollectionService {
 
         apply(collection, input);
         repository.save(collection);
-        auditService.record("CREATE", "COLLECTION", collection.getUuid(), "Skapade samlingen " + collection.getTitle());
+        auditService.record("CREATE", "COLLECTION", collection.getUuid(), StoredText.of("audit.collection.create", collection.getTitle()));
         return toDto(collection, caller);
     }
 
@@ -209,7 +210,7 @@ public class CollectionService {
         final VideoCollection collection = find(id);
 
         apply(collection, input);
-        auditService.record("UPDATE", "COLLECTION", collection.getUuid(), "Ändrade samlingen " + collection.getTitle());
+        auditService.record("UPDATE", "COLLECTION", collection.getUuid(), StoredText.of("audit.collection.update", collection.getTitle()));
         return toDto(collection, caller);
     }
 
@@ -220,7 +221,7 @@ public class CollectionService {
         final VideoCollection collection = find(id);
 
         repository.delete(collection);
-        auditService.record("DELETE", "COLLECTION", collection.getUuid(), "Tog bort samlingen " + collection.getTitle());
+        auditService.record("DELETE", "COLLECTION", collection.getUuid(), StoredText.of("audit.collection.delete", collection.getTitle()));
     }
 
     private void apply(final VideoCollection collection, final CollectionInput input) {
