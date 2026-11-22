@@ -135,7 +135,15 @@ public class PlaybackService {
             throw new BadRequestException("error.video.notReady");
         }
 
-        final Instant expires = clock.instant().plus(Duration.ofMillis(Objects.requireNonNullElse(video.getDurationMs(), 0L))).plus(margin);
+        return signedPlayback(video);
+    }
+
+    /**
+     * Signed addresses for playing a video, without asking whether the caller may: for callers that checked already,
+     * such as Spexipedia's service account for a listed video (spexipediaVideo).
+     */
+    public PlaybackDto signedPlayback(final Video video) {
+        final Instant expires = expiry(video);
         final String prefix = signer.prefix(video.getUuid().toString(), expires);
 
         return new PlaybackDto(prefix + video.getGeneration() + "/master.m3u8",
@@ -145,6 +153,23 @@ public class PlaybackService {
                                 prefix + "subtitles/" + subtitle.getLanguage() + ".vtt"))
                         .toList(),
                 expires);
+    }
+
+    /**
+     * When the video's addresses expire: its length plus the margin from now.
+     */
+    public Instant expiry(final Video video) {
+        return clock.instant().plus(Duration.ofMillis(Objects.requireNonNullElse(video.getDurationMs(), 0L))).plus(margin);
+    }
+
+    /**
+     * A signed address of the video's poster: the uploaded one, else the frame taken in processing; null without.
+     */
+    public @Nullable String signedPoster(final Video video, final Instant expires, final boolean uploaded, final boolean frame) {
+        final String prefix = signer.prefix(video.getUuid().toString(), expires);
+
+        return video.isPosterUploaded() && uploaded ? prefix + "poster-uploaded.jpg"
+                : frame ? prefix + video.getGeneration() + "/poster.jpg" : null;
     }
 
     @Transactional

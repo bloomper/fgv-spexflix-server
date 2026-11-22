@@ -66,6 +66,8 @@ type Query {
     maintenanceJobs: [MaintenanceJobStatus!]!
     "ADMIN. How the copy of Spexipedia's base data follows its change feed, and the latest changes that were skipped."
     spexipediaSync: SpexipediaSyncStatus!
+    "SPEXIPEDIA. A listed video (published, ready, not in the trash) for a section of a spex page in Spexipedia, with its poster, chapters and signed playback addresses; null for any other video."
+    spexipediaVideo(id: ID!): SpexipediaVideoEmbed
     "SPEXIPEDIA. The published videos about the spex (or revivals of them). At most 500 ids."
     spexipediaVideos(spexIds: [ID!]!): [SpexipediaVideo!]!
 }
@@ -564,6 +566,22 @@ type CreditedVideo {
     video: Video!
     "What the name does or plays in the video."
     role: String
+}
+
+type SpexipediaVideoEmbed {
+    id: ID!
+    title: String!
+    year: Int
+    durationMs: Float
+    "A signed address of the poster on the media hostname; null without one."
+    posterUrl: String
+    chapters: [SpexipediaChapter!]!
+    playback: Playback!
+}
+
+type SpexipediaChapter {
+    title: String!
+    startSeconds: Int!
 }
 
 type SpexipediaVideo {
