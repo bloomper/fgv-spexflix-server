@@ -17,7 +17,7 @@
 package nu.fgv.spexflix.server.admin;
 
 import java.util.Locale;
-import nu.fgv.spexflix.server.audit.AuditText;
+import nu.fgv.spexflix.server.util.StoredText;
 import org.springframework.context.MessageSource;
 import nu.fgv.spexflix.server.audit.AuditEntry;
 import nu.fgv.spexflix.server.audit.AuditFilter;
@@ -89,7 +89,7 @@ public class AdminGraphqlApi {
         return new AuditPageDto(entries.getContent().stream()
                 .map(entry -> new AuditLogEntryDto(entry.getId(), entry.getAt(), entry.getActorSubject(), entry.getActorName(),
                         entry.getAction(), entry.getEntityType(), entry.getEntityId(),
-                        AuditText.decode(entry.getSummary()).in(messages, locale)))
+                        StoredText.decode(entry.getSummary()).in(messages, locale)))
                 .toList(), entries.getTotalElements(), entries.getNumber(), entries.getSize());
     }
 

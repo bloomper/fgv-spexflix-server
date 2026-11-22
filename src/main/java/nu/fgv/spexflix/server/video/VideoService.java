@@ -18,7 +18,7 @@ package nu.fgv.spexflix.server.video;
 
 import lombok.extern.slf4j.Slf4j;
 import nu.fgv.spexflix.server.audit.AuditService;
-import nu.fgv.spexflix.server.audit.AuditText;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.processing.JobStatus;
 import nu.fgv.spexflix.server.processing.MediaStorage;
 import nu.fgv.spexflix.server.processing.ProcessingJob;
@@ -229,7 +229,7 @@ public class VideoService {
 
         apply(video, input);
         videoRepository.save(video);
-        auditService.record("CREATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.create", video.getTitle()));
+        auditService.record("CREATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.create", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -240,7 +240,7 @@ public class VideoService {
         final Video video = editable(id);
 
         apply(video, input);
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.update", video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.update", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -383,7 +383,7 @@ public class VideoService {
         job.setCreatedAt(clock.instant());
         jobRepository.save(job);
         auditService.record(first ? action : "REPLACE", "VIDEO", video.getUuid(),
-                AuditText.of(!first ? "audit.video.replaceFile" : action.equals("IMPORT") ? "audit.video.importFile" : "audit.video.uploadFile",
+                StoredText.of(!first ? "audit.video.replaceFile" : action.equals("IMPORT") ? "audit.video.importFile" : "audit.video.uploadFile",
                         video.getTitle()));
         return VideoDtos.toDto(video);
     }
@@ -474,7 +474,7 @@ public class VideoService {
         if (video.getStatus() != VideoStatus.READY) {
             video.setStatus(VideoStatus.PROCESSING);
         }
-        auditService.record("REPROCESS", "VIDEO", video.getUuid(), AuditText.of("audit.video.reprocess", video.getTitle()));
+        auditService.record("REPROCESS", "VIDEO", video.getUuid(), StoredText.of("audit.video.reprocess", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -492,7 +492,7 @@ public class VideoService {
             video.setPublishedAt(clock.instant());
         }
         auditService.record(published ? "PUBLISH" : "UNPUBLISH", "VIDEO", video.getUuid(),
-                AuditText.of(published ? "audit.video.publish" : "audit.video.unpublish", video.getTitle()));
+                StoredText.of(published ? "audit.video.publish" : "audit.video.unpublish", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -504,7 +504,7 @@ public class VideoService {
 
         video.setTrashedAt(trashed ? clock.instant() : null);
         auditService.record(trashed ? "TRASH" : "RESTORE", "VIDEO", video.getUuid(),
-                AuditText.of(trashed ? "audit.video.trash" : "audit.video.restore", video.getTitle()));
+                StoredText.of(trashed ? "audit.video.trash" : "audit.video.restore", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -532,7 +532,7 @@ public class VideoService {
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-        auditService.record("DELETE", "VIDEO", video.getUuid(), AuditText.of("audit.video.delete", video.getTitle()));
+        auditService.record("DELETE", "VIDEO", video.getUuid(), StoredText.of("audit.video.delete", video.getTitle()));
         videoRepository.delete(video);
     }
 
@@ -561,7 +561,7 @@ public class VideoService {
         }
         video.setPosterSeconds(seconds);
         video.setPosterUploaded(false);
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.replacePoster", video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.replacePoster", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -578,7 +578,7 @@ public class VideoService {
             throw new UncheckedIOException(e);
         }
         video.setPosterUploaded(true);
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.uploadPoster", video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.uploadPoster", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -602,7 +602,7 @@ public class VideoService {
             chapter.setSpexifyTrackTitle(input.spexifyTrackTitle() == null ? null : limit(input.spexifyTrackTitle()));
             video.getChapters().add(chapter);
         });
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.chapters", video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.chapters", video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -634,7 +634,7 @@ public class VideoService {
         });
 
         subtitle.setLabel(limit(label.strip()));
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.uploadSubtitles", language, video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.uploadSubtitles", language, video.getTitle()));
         return VideoDtos.toDto(video);
     }
 
@@ -650,7 +650,7 @@ public class VideoService {
         } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
-        auditService.record("UPDATE", "VIDEO", video.getUuid(), AuditText.of("audit.video.removeSubtitles", language, video.getTitle()));
+        auditService.record("UPDATE", "VIDEO", video.getUuid(), StoredText.of("audit.video.removeSubtitles", language, video.getTitle()));
         return VideoDtos.toDto(video);
     }
 

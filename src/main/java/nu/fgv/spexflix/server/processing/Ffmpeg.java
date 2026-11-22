@@ -17,6 +17,8 @@
 package nu.fgv.spexflix.server.processing;
 
 import nu.fgv.spexflix.server.config.SpexflixProperties;
+import nu.fgv.spexflix.server.util.StoredText;
+import nu.fgv.spexflix.server.util.TextException;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -69,18 +71,19 @@ public class Ffmpeg {
         try {
             if (!process.waitFor(timeout.toSeconds(), TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new IOException("ffmpeg timed out");
+                throw TextException.io(StoredText.of("media.failed.timedOut", "ffmpeg"), null);
             }
             if (process.exitValue() != 0) {
                 final String error = stderr.join().strip();
 
-                throw new IOException((error.isEmpty() ? "exit " + process.exitValue() : error.lines().reduce((a, b) -> b).orElse(error)));
+                throw TextException.io(error.isEmpty() ? StoredText.of("media.failed.exit", "ffmpeg", process.exitValue())
+                        : StoredText.of("media.failed.tool", "ffmpeg", error.lines().reduce((a, b) -> b).orElse(error)), null);
             }
             return stdout.join();
         } catch (final InterruptedException e) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted", e);
+            throw TextException.io(StoredText.of("media.failed.interrupted", "ffmpeg"), e);
         }
     }
 

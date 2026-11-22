@@ -20,6 +20,7 @@ import nu.fgv.spexflix.server.TestClock;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
 import nu.fgv.spexflix.server.settings.Settings;
 import nu.fgv.spexflix.server.settings.SettingsService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoRepository;
 import nu.fgv.spexflix.server.video.VideoStatus;
@@ -200,6 +201,6 @@ class ProcessingWorkerTest {
         lost.setAttempts(3);
         worker.tick();
         assertThat(lost.getStatus()).isEqualTo(JobStatus.FAILED);
-        assertThat(lost.getError()).isEqualTo("Stopped 3 times");
+        assertThat(StoredText.decode(lost.getError())).isEqualTo(StoredText.of("processing.failed.stopped", 3));
     }
 }

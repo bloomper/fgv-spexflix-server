@@ -17,7 +17,7 @@
 package nu.fgv.spexflix.server.settings;
 
 import nu.fgv.spexflix.server.audit.AuditService;
-import nu.fgv.spexflix.server.audit.AuditText;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
@@ -104,7 +104,7 @@ public class SettingsService {
         settings.setLastModifiedBy(caller.subject());
         settings.setLastModifiedAt(clock.instant());
         repository.save(settings);
-        auditService.record("UPDATE", "SETTINGS", null, AuditText.of("audit.settings.update"));
+        auditService.record("UPDATE", "SETTINGS", null, StoredText.of("audit.settings.update"));
         return toDto(settings);
     }
 

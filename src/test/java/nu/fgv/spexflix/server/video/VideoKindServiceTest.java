@@ -17,7 +17,7 @@ package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.TestCallers;
 import nu.fgv.spexflix.server.audit.AuditService;
-import nu.fgv.spexflix.server.audit.AuditText;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
@@ -95,7 +95,7 @@ class VideoKindServiceTest {
         assertThat(created.nameEn()).isEqualTo("Jubilee");
         assertThat(created.position()).isEqualTo(3);
         verify(auditService).record(eq("CREATE"), eq("VIDEO_KIND"), any(), argThat(text -> "audit.videoKind.create".equals(text.code())
-                && text.args().getFirst() instanceof AuditText name && name.args().contains("Jubileum")));
+                && text.args().getFirst() instanceof StoredText name && name.args().contains("Jubileum")));
     }
 
     @Test

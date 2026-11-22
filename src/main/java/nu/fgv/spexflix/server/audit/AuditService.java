@@ -19,6 +19,7 @@ package nu.fgv.spexflix.server.audit;
 import jakarta.persistence.criteria.Predicate;
 import nu.fgv.spexflix.server.user.Caller;
 import nu.fgv.spexflix.server.user.CallerService;
+import nu.fgv.spexflix.server.util.StoredText;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -93,7 +94,7 @@ public class AuditService {
     }
 
     @Transactional
-    public void record(final String action, final String entityType, final @Nullable UUID entityId, final AuditText summary) {
+    public void record(final String action, final String entityType, final @Nullable UUID entityId, final StoredText summary) {
         final AuditEntry entry = new AuditEntry();
         final Caller caller = callerService.currentIfAny().orElse(null);
 

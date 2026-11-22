@@ -18,6 +18,7 @@ package nu.fgv.spexflix.server.mcp;
 
 import nu.fgv.spexflix.server.playback.PlaybackService;
 import nu.fgv.spexflix.server.user.CallerService;
+import nu.fgv.spexflix.server.util.StoredText;
 import nu.fgv.spexflix.server.util.error.ResourceNotFoundException;
 import nu.fgv.spexflix.server.video.CreditService;
 import nu.fgv.spexflix.server.video.VideoDtos.VideoDto;
@@ -30,12 +31,14 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -55,9 +58,11 @@ public class VideoMcpTools {
     private final CreditService creditService;
     private final CallerService callerService;
     private final McpToolSupport support;
+    private final MessageSource messages;
 
     public VideoMcpTools(final VideoService videoService, final PlaybackService playbackService, final CreditService creditService,
-                         final CallerService callerService, final McpToolSupport support) {
+                         final CallerService callerService, final McpToolSupport support, final MessageSource messages) {
+        this.messages = messages;
         this.videoService = videoService;
         this.playbackService = playbackService;
         this.creditService = creditService;
@@ -129,7 +134,7 @@ public class VideoMcpTools {
                     video.chapters().stream().map(chapter -> new McpChapter(chapter.startSeconds(), chapter.title(), chapter.spexifyTrackTitle())).toList(),
                     creditService.creditsOf(Set.of(videoId)).getOrDefault(videoId, List.of()).stream()
                             .map(credit -> new McpCredit(credit.name(), credit.role())).toList(),
-                    editor ? video.failure() : null, editor ? video.trashedAt() != null : null);
+                    editor && video.failure() != null ? StoredText.decode(video.failure()).in(messages, Locale.ENGLISH) : null, editor ? video.trashedAt() != null : null);
         });
     }
 
