@@ -21,8 +21,8 @@ services:
     #ports:
     #  - "3309:3306"
     volumes:
-      - fgv_spexflix_mysql_data:/var/lib/mysql
-      - fgv_spexflix_mysql_log:/var/log/mysql
+      - ./.docker/mysql/data:/var/lib/mysql
+      - ./.docker/mysql/log:/var/log/mysql
     secrets:
       - FGV_SPEXFLIX_MYSQL_ROOT_PASSWORD
       - FGV_SPEXFLIX_MYSQL_USER_PASSWORD
@@ -47,7 +47,7 @@ services:
       - "127.0.0.1:8084:80"
     volumes:
       - ${SPEXFLIX_DEPLOY:-../fgv-spexflix-deploy}/media/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./data/media/hls:/media/hls:ro
+      - ${API_DATA:-./.docker/api}/media/hls:/media/hls:ro
     networks:
       - default
       - fgv
@@ -68,6 +68,7 @@ services:
       SPEXFLIX_KEYCLOAK_URL: http://keycloak-server:8080/auth
       API_KEYCLOAK_REALM: ${API_KEYCLOAK_REALM}
       API_MEDIA_ROOT: /data/media
+      API_IMPORTS_ROOT: /data/imports
       SPEXFLIX_MEDIA_BASE_URL: https://media.spexflix.fgv.local.nu:8443
       API_SPEXIPEDIA_GRAPHQL_URL: http://spexipedia-api:8080/api/graphql
       SPEXIPEDIA_WEB_URL: ${SPEXIPEDIA_WEB_URL:-https://spexipedia.fgv.local.nu:8443}
@@ -88,8 +89,9 @@ services:
       spexflix-mysql:
         condition: service_healthy
     volumes:
-      - fgv_spexflix_api_log:/data/log_data
-      - ./data/media:/data/media
+      - ${API_DATA:-./.docker/api}/log_data:/data/log_data
+      - ${API_DATA:-./.docker/api}/media:/data/media
+      - ${API_DATA:-./.docker/api}/imports:/data/imports
     networks:
       - default
       - fgv
@@ -98,26 +100,6 @@ services:
         target: MYSQL_API_USER_PASSWORD
       - API_KEYCLOAK_SERVICE_CLIENT_SECRET
       - API_MEDIA_SIGNING_KEY
-
-volumes:
-  fgv_spexflix_mysql_data:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexflix-mysql/data
-      o: bind
-  fgv_spexflix_mysql_log:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexflix-mysql/log
-      o: bind
-  fgv_spexflix_api_log:
-    driver: local
-    driver_opts:
-      type: none
-      device: .docker/fgv-spexflix-api/log_data
-      o: bind
 
 networks:
   fgv:
