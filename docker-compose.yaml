@@ -38,6 +38,8 @@ services:
         exec /docker-entrypoint.sh nginx -g 'daemon off;'
     environment:
       SPEXFLIX_WEB_ORIGIN: ${SPEXFLIX_WEB_ORIGIN:-http://localhost:3003}
+      # Spexipedia's web, whose spex pages play videos in sections of their own
+      SPEXIPEDIA_WEB_ORIGIN: ${SPEXIPEDIA_WEB_ORIGIN:-http://localhost:3006}
     healthcheck:
       test: [ "CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/healthz" ]
       interval: 10s
