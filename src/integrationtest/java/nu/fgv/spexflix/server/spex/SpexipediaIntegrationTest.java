@@ -57,6 +57,21 @@ class SpexipediaIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void spexipediaGetsSignedPlaybackOfAListedVideoOnly() throws Exception {
+        final String published = readyVideo(folder, true);
+        final String unpublished = readyVideo(folder, false);
+        final String query = "query($id: ID!) { spexipediaVideo(id: $id) { id title durationMs chapters { title } playback { masterUrl expiresAt } } }";
+
+        graphQlWithToken(serviceToken(SPEXIPEDIA_SERVICE)).document(query).variable("id", published).execute()
+                .path("spexipediaVideo.id").entity(String.class).isEqualTo(published)
+                .path("spexipediaVideo.playback.masterUrl").entity(String.class).satisfies(url ->
+                        assertThat(url).contains("/v/").contains(published).endsWith("/master.m3u8"));
+        graphQlWithToken(serviceToken(SPEXIPEDIA_SERVICE)).document(query).variable("id", unpublished).execute()
+                .path("spexipediaVideo").valueIsNull();
+        expectError(graphQl(EDITOR).document(query).variable("id", published).execute(), "FORBIDDEN");
+    }
+
+    @Test
     void onlySpexipediaReadsItsLinks() {
         expectError(graphQl(EDITOR).document(VIDEOS).variable("spex", List.of(SPEX_ID)).execute(), "FORBIDDEN");
         expectError(graphQlWithToken(spexifyServiceToken()).document(VIDEOS).variable("spex", List.of(SPEX_ID)).execute(), "FORBIDDEN");

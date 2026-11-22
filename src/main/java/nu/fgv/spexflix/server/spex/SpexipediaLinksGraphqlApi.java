@@ -16,7 +16,11 @@
 
 package nu.fgv.spexflix.server.spex;
 
+
+import nu.fgv.spexflix.server.playback.PlaybackService;
+import nu.fgv.spexflix.server.processing.MediaStorage;
 import nu.fgv.spexflix.server.user.CallerService;
+import nu.fgv.spexflix.server.video.Chapter;
 import nu.fgv.spexflix.server.video.SpexRef;
 import nu.fgv.spexflix.server.video.Video;
 import nu.fgv.spexflix.server.video.VideoRepository;
@@ -27,6 +31,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -45,10 +50,38 @@ public class SpexipediaLinksGraphqlApi {
 
     private final VideoRepository videoRepository;
     private final CallerService callerService;
+    private final PlaybackService playbackService;
+    private final MediaStorage storage;
 
-    public SpexipediaLinksGraphqlApi(final VideoRepository videoRepository, final CallerService callerService) {
+    public SpexipediaLinksGraphqlApi(final VideoRepository videoRepository, final CallerService callerService,
+                                     final PlaybackService playbackService, final MediaStorage storage) {
         this.videoRepository = videoRepository;
         this.callerService = callerService;
+        this.playbackService = playbackService;
+        this.storage = storage;
+    }
+
+    /**
+     * SPEXIPEDIA. A listed video (published, ready, not in the trash) for a section of a spex page in Spexipedia
+     * (Spexipedia's spec 4.2.1): its poster, chapters and signed playback addresses; null for any other video.
+     * Spexipedia shows it only to users with access to Spexflix.
+     */
+    @QueryMapping
+    @Transactional(readOnly = true)
+    public @Nullable VideoEmbed spexipediaVideo(@Argument final UUID id) {
+        if (!callerService.current().isSpexipediaService()) {
+            throw new AccessDeniedException("SPEXIPEDIA required");
+        }
+        return videoRepository.findByUuid(id).filter(Video::isListed).map(video -> {
+            final PlaybackService.PlaybackDto playback = playbackService.signedPlayback(video);
+
+            return new VideoEmbed(video.getUuid(), video.getTitle(), video.getYear(), video.getDurationMs(),
+                    playbackService.signedPoster(video, playback.expiresAt(), Files.isRegularFile(storage.uploadedPoster(video)),
+                            Files.isRegularFile(storage.poster(video))),
+                    video.getChapters().stream().sorted(java.util.Comparator.comparingInt(Chapter::getStartSeconds))
+                            .map(chapter -> new ChapterEmbed(chapter.getTitle(), chapter.getStartSeconds())).toList(),
+                    playback);
+        }).orElse(null);
     }
 
     @QueryMapping
@@ -78,5 +111,12 @@ public class SpexipediaLinksGraphqlApi {
     }
 
     public record VideoLink(UUID id, String title, @Nullable UUID spexId) {
+    }
+
+    public record VideoEmbed(UUID id, String title, @Nullable Integer year, @Nullable Long durationMs, @Nullable String posterUrl,
+                             List<ChapterEmbed> chapters, PlaybackService.PlaybackDto playback) {
+    }
+
+    public record ChapterEmbed(String title, int startSeconds) {
     }
 }
