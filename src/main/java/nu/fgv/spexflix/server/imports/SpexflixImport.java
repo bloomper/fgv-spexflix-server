@@ -90,7 +90,7 @@ public class SpexflixImport {
         }
         return kinds.match(name).map(VideoKind::getUuid).orElseGet(() -> {
             if (batch.createMissingKinds()) {
-                batch.warn("Ny filmsort: " + name.strip());
+                batch.warn("import.warning.newVideoKind", name.strip());
                 return kinds.createForImport(name.strip()).getUuid();
             }
             throw new BadRequestException("error.kind.unknown", name,
