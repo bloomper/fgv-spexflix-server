@@ -16,6 +16,7 @@
 
 package nu.fgv.spexflix.server.admin;
 
+import org.springframework.context.support.StaticMessageSource;
 import nu.fgv.spexflix.server.audit.AuditEntry;
 import nu.fgv.spexflix.server.audit.AuditService;
 import nu.fgv.spexflix.server.processing.ProcessingService;
@@ -28,6 +29,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -50,11 +52,11 @@ class AdminGraphqlApiTest {
 
     @Test
     void theAuditLogAnswersWithThePageItWasClampedTo() {
-        final AdminGraphqlApi api = new AdminGraphqlApi(settingsService, auditService, processingService);
+        final AdminGraphqlApi api = new AdminGraphqlApi(settingsService, auditService, processingService, new StaticMessageSource());
 
         when(auditService.page(-3, 100_000, null)).thenReturn(new PageImpl<AuditEntry>(List.of(), PageRequest.of(0, 200), 0));
 
-        final AdminGraphqlApi.AuditPageDto page = api.auditLog(-3, 100_000, null);
+        final AdminGraphqlApi.AuditPageDto page = api.auditLog(-3, 100_000, null, Locale.ENGLISH);
 
         assertThat(page.page()).isZero();
         assertThat(page.size()).isEqualTo(200);

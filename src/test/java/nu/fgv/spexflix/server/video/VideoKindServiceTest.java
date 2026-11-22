@@ -17,6 +17,7 @@ package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.TestCallers;
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.audit.AuditText;
 import nu.fgv.spexflix.server.user.CallerService;
 import nu.fgv.spexflix.server.util.error.BadRequestException;
 import nu.fgv.spexflix.server.util.error.ConflictException;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import static nu.fgv.spexflix.server.util.TestUuids.uuid;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -92,7 +94,8 @@ class VideoKindServiceTest {
         assertThat(created.nameSv()).isEqualTo("Jubileum");
         assertThat(created.nameEn()).isEqualTo("Jubilee");
         assertThat(created.position()).isEqualTo(3);
-        verify(auditService).record(eq("CREATE"), eq("VIDEO_KIND"), any(), eq("Skapade filmsorten Jubileum"));
+        verify(auditService).record(eq("CREATE"), eq("VIDEO_KIND"), any(), argThat(text -> "audit.videoKind.create".equals(text.code())
+                && text.args().getFirst() instanceof AuditText name && name.args().contains("Jubileum")));
     }
 
     @Test

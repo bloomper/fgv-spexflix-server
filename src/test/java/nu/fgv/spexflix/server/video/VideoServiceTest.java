@@ -18,6 +18,7 @@ package nu.fgv.spexflix.server.video;
 
 import nu.fgv.spexflix.server.TestCallers;
 import nu.fgv.spexflix.server.audit.AuditService;
+import nu.fgv.spexflix.server.audit.AuditText;
 import nu.fgv.spexflix.server.config.SpexflixProperties;
 import nu.fgv.spexflix.server.processing.MediaStorage;
 import nu.fgv.spexflix.server.processing.ProcessingJob;
@@ -286,7 +287,7 @@ class VideoServiceTest {
         ready.setPublished(false);
         service.publish(uuid(1), true);
         assertThat(ready.getPublishedAt()).isEqualTo(NOW);
-        verify(auditService).record("PUBLISH", "VIDEO", uuid(1), "Publicerade Cleopatra");
+        verify(auditService).record("PUBLISH", "VIDEO", uuid(1), AuditText.of("audit.video.publish", "Cleopatra"));
     }
 
     @Test
@@ -324,7 +325,7 @@ class VideoServiceTest {
 
         assertThat(service.setFile(uuid(1), "u-2").status()).isEqualTo(VideoStatus.READY);
         assertThat(storage.originals(ready).resolve("pending-" + NOW.toEpochMilli() + ".mov")).exists();
-        verify(auditService).record("REPLACE", "VIDEO", uuid(1), "Bytte filen för Cleopatra");
+        verify(auditService).record("REPLACE", "VIDEO", uuid(1), AuditText.of("audit.video.replaceFile", "Cleopatra"));
     }
 
     @Test
