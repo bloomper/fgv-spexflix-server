@@ -114,7 +114,9 @@ public class SampleDataImporter {
     private static final Duration SPEXIPEDIA_RETRY_INTERVAL = Duration.ofSeconds(10);
     private static final List<String> TABLES = List.of("audit_entry", "video_collection_video", "video_collection", "playlist_item", "playlist", "video_like", "video_credit", "video_rating", "watch_list_entry", "watch_progress", "processing_job", "video_spex",
             "chapter", "subtitle", "rendition", "video", "upload_session", "app_user");
-    /** Sample cast and crew, with what they do or play; each show credits some of them. */
+    /**
+     * Sample cast and crew, with what they do or play; each show credits some of them.
+     */
     private static final List<String[]> CREDITS = List.of(
             new String[]{"Anna Andersson", "Kleopatra"}, new String[]{"Bertil Berg", "Caesar"},
             new String[]{"Cecilia Ceder", "Berättaren"}, new String[]{"David Dahl", "Hjälten"},

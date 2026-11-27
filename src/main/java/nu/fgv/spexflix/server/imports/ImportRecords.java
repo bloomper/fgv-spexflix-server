@@ -40,7 +40,8 @@ public final class ImportRecords {
                         @Nullable List<ImportCollection> collections) {
     }
 
-    public record ImportVideo(String sourceKey, @Nullable List<UUID> spexIds, @Nullable String kind, @Nullable String title,
+    public record ImportVideo(String sourceKey, @Nullable List<UUID> spexIds, @Nullable String kind,
+                              @Nullable String title,
                               @Nullable Integer year, @Nullable String performance, @Nullable String performanceDate,
                               @Nullable String description, FileRef file, @Nullable List<ImportChapter> chapters) {
     }
@@ -48,6 +49,7 @@ public final class ImportRecords {
     public record ImportChapter(int startSeconds, String title) {
     }
 
-    public record ImportCollection(String sourceKey, String title, @Nullable String description, List<String> videoSourceKeys) {
+    public record ImportCollection(String sourceKey, String title, @Nullable String description,
+                                   List<String> videoSourceKeys) {
     }
 }

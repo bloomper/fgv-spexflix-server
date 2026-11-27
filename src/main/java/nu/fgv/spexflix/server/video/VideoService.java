@@ -388,7 +388,9 @@ public class VideoService {
         return VideoDtos.toDto(video);
     }
 
-    /** The optimistic-lock version of a video, or null when it is gone. */
+    /**
+     * The optimistic-lock version of a video, or null when it is gone.
+     */
     @Transactional(readOnly = true)
     public @Nullable Long recordVersion(final UUID id) {
         return videoRepository.findByUuid(id).map(Video::getVersion).orElse(null);
