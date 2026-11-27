@@ -88,7 +88,8 @@ public class PlaylistMcpTools {
      * A playlist; {@code owned} when it is the caller's, {@code ownerName} whose it is.
      */
     public record McpPlaylist(UUID id, String name, @Nullable String description, boolean isPublic, boolean owned,
-                              @Nullable String ownerName, int itemCount, long durationSeconds, @Nullable String webUrl) {
+                              @Nullable String ownerName, int itemCount, long durationSeconds,
+                              @Nullable String webUrl) {
     }
 
     /**

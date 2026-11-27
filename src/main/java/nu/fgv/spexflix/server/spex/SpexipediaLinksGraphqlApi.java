@@ -113,7 +113,8 @@ public class SpexipediaLinksGraphqlApi {
     public record VideoLink(UUID id, String title, @Nullable UUID spexId) {
     }
 
-    public record VideoEmbed(UUID id, String title, @Nullable Integer year, @Nullable Long durationMs, @Nullable String posterUrl,
+    public record VideoEmbed(UUID id, String title, @Nullable Integer year, @Nullable Long durationMs,
+                             @Nullable String posterUrl,
                              List<ChapterEmbed> chapters, PlaybackService.PlaybackDto playback) {
     }
 

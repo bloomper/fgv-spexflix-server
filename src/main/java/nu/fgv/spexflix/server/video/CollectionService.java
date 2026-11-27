@@ -248,7 +248,9 @@ public class CollectionService {
         return repository.findByUuid(id).orElseThrow(() -> new ResourceNotFoundException("error.collection.notFound", id));
     }
 
-    /** The optimistic-lock version of a collection, or null when it is gone. */
+    /**
+     * The optimistic-lock version of a collection, or null when it is gone.
+     */
     @Transactional(readOnly = true)
     public @Nullable Long recordVersion(final UUID id) {
         return repository.findByUuid(id).map(VideoCollection::getVersion).orElse(null);
